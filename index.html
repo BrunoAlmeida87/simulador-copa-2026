@@ -77,6 +77,20 @@
   .ribbon{display:inline-block;font-size:11px;font-weight:800;padding:3px 10px;border-radius:20px}
   details summary{cursor:pointer;color:var(--accent2);font-weight:600;margin:6px 0}
   .toprow td{font-size:13px}
+  /* ----- abas ----- */
+  .tabs{display:flex;gap:6px;margin:16px 0 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
+  .tabbtn{background:transparent;border:1px solid transparent;border-bottom:none;border-radius:10px 10px 0 0;
+    padding:11px 20px;font-size:14px;font-weight:700;color:var(--muted)}
+  .tabbtn:hover{color:var(--txt);background:#11161d;border-color:var(--line)}
+  .tabbtn.active{color:var(--txt);background:var(--panel);border-color:var(--line);margin-bottom:-1px}
+  .tabpane{padding-top:8px}
+  /* ----- prognósticos ----- */
+  td.win{background:#10311c !important;color:#7ee2a0;font-weight:800}
+  .predgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(440px,1fr));gap:12px}
+  .champbanner{border:1px solid var(--gold);background:linear-gradient(135deg,#2a2410,#161b22);border-radius:12px;
+    padding:14px 16px;margin:10px 0;display:flex;align-items:center;gap:14px}
+  .champbanner .big{font-size:24px;color:var(--gold)}
+  .predbase b{color:var(--accent2)}
   @media(max-width:640px){ input.obs{width:150px} .big{font-size:24px} }
 </style>
 </head>
@@ -99,6 +113,14 @@
 </header>
 
 <div class="wrap">
+
+  <!-- ============ ABAS ============ -->
+  <div class="tabs" role="tablist">
+    <button class="tabbtn active" data-tab="sim">🎲 Simulador</button>
+    <button class="tabbtn" data-tab="pred">📊 Prognósticos das Partidas</button>
+  </div>
+
+  <div id="pane-sim" class="tabpane">
 
   <!-- ============ CONTROLES ============ -->
   <div class="panel">
@@ -199,6 +221,38 @@
   <!-- ============ METODOLOGIA ============ -->
   <h2>10 · Metodologia, limitações e fontes</h2>
   <div class="panel" id="methodology"></div>
+
+  </div><!-- /pane-sim -->
+
+  <!-- ============ ABA: PROGNÓSTICOS DAS PARTIDAS ============ -->
+  <div id="pane-pred" class="tabpane hide">
+
+    <h2>Prognósticos das Partidas <span class="note">(Poisson analítico sobre os gols esperados do próprio modelo)</span></h2>
+    <div class="panel">
+      <div class="row" style="justify-content:space-between;align-items:flex-start;gap:12px">
+        <div id="predBase" class="predbase status"></div>
+        <div class="row">
+          <button id="btnPredUpd" class="primary">🔄 Atualizar prognósticos</button>
+          <button id="btnPredCsv">⬇ Exportar prognósticos (CSV)</button>
+        </div>
+      </div>
+      <p class="note" style="margin:8px 0 0">
+        Para cada jogo: <b>xG A/B</b> = gols esperados (mesma função do simulador) · <b>Tot</b> = total de gols esperados ·
+        <b>Placar</b> = mais provável pela distribuição de Poisson · <b>Vit./Emp.</b> = resultado em 90' ·
+        <b>+2.5</b> = probabilidade de mais de 2,5 gols · <b>Ambas</b> = ambas as equipes marcam.
+        No mata-mata: <b>Pênaltis</b> = empate em 90' × empate na prorrogação, e <b>Avança</b> combina vitória em 90' + prorrogação + pênaltis.
+        Tudo é recalculado com os pesos e dados atuais (ao abrir a aba, em “Atualizar” ou ao terminar uma simulação).
+      </p>
+    </div>
+
+    <h2>Fase de grupos <span class="note">(72 jogos — todos os confrontos dentro de cada grupo)</span></h2>
+    <div id="predGroups" class="predgrid"></div>
+
+    <h2>Mata-mata projetado</h2>
+    <div id="predChamp"></div>
+    <div id="predKO"></div>
+
+  </div><!-- /pane-pred -->
 
 </div>
 
@@ -655,6 +709,7 @@ function runSimulations(N){
     setProg(100); setStatus('Pronto — '+N.toLocaleString('pt-BR')+' simulações em '+dt+'s.');
     log('Campeã mais provável no modelo: '+[...rows].sort((a,b)=>b.pTit-a.pTit)[0].nome);
     renderAll();
+    if(activeTab==='pred') renderPredictions(); // atualiza os prognósticos ao fim da simulação
   }
   step();
 }
@@ -680,7 +735,7 @@ function renderWeights(){
   box.querySelectorAll('input[type=range]').forEach(r=>{
     r.addEventListener('input',e=>{
       const k=e.target.dataset.w; W[k]=+e.target.value; $('#wv-'+k).textContent=W[k]+'%';
-      updateWsum(); recompute(); updateForca();
+      updateWsum(); recompute(); updateForca(); schedulePredictions();
     });
   });
   updateWsum();
@@ -712,7 +767,7 @@ function renderTeamsTable(){
     inp.addEventListener('input',e=>{
       const id=+e.target.dataset.id, f=e.target.dataset.f;
       teams[id][f] = (f==='obs') ? e.target.value : (parseFloat(e.target.value)||0);
-      if(f!=='obs'){ recompute(); updateForca(); }
+      if(f!=='obs'){ recompute(); updateForca(); schedulePredictions(); }
     });
   });
   updateForca();
@@ -973,6 +1028,249 @@ function renderMethodology(){
 }
 
 /* =====================================================================================
+   PARTE 4 — PROGNÓSTICOS DAS PARTIDAS (Poisson analítico, reaproveitando o motor de gols)
+   -------------------------------------------------------------------------------------
+   NÃO cria um modelo paralelo: usa a MESMA Força Final e a MESMA função de gols esperados
+   (lambda) da simulação Monte Carlo. A diferença é que aqui as probabilidades são resolvidas
+   ANALITICAMENTE (Poisson + convolução de placares), o que dá números exatos e estáveis,
+   sem o ruído amostral de rodar simulações. Por usar o mesmo λ, os prognósticos são
+   coerentes com a simulação (que sorteia gols pela mesma distribuição de Poisson).
+   ===================================================================================== */
+
+let activeTab='sim';        // aba atual
+let _predData=null;         // cache dos prognósticos calculados (para render e CSV)
+let _predTimer=null;        // debounce de recálculo
+
+/* alias explícito pedido no enunciado: gols esperados de A contra B (reaproveita o motor) */
+function expectedGoals(a,b,phase){ if(!P) recompute(); return lambda(a,b,phase||'g'); }
+
+/* vetor de probabilidades Poisson P(X=0..maxK), normalizado p/ somar 1 (corrige a cauda cortada) */
+function poissonVec(lam,maxK){
+  maxK=maxK||10; lam=Math.max(0,lam);
+  const v=new Array(maxK+1); let p=Math.exp(-lam), s=p; v[0]=p;
+  for(let k=1;k<=maxK;k++){ p=p*lam/k; v[k]=p; s+=p; }
+  for(let k=0;k<=maxK;k++) v[k]/=s;
+  return v;
+}
+
+/* probabilidades de UM jogo a partir dos xG (Poisson independente — igual ao motor de gols).
+   Combina P(A=i)·P(B=j) em todos os placares e soma os casos de cada evento. */
+function matchProbs(la,lb){
+  const M=10, A=poissonVec(la,M), B=poissonVec(lb,M);
+  let pA=0,pD=0,pB=0,over=0,btts=0,bestP=0,bs=[0,0];
+  for(let i=0;i<=M;i++)for(let j=0;j<=M;j++){
+    const p=A[i]*B[j];
+    if(i>j)pA+=p; else if(i===j)pD+=p; else pB+=p; // vitória A / empate / vitória B
+    if(i+j>=3)over+=p;                              // +2.5 gols
+    if(i>=1&&j>=1)btts+=p;                          // ambas marcam
+    if(p>bestP){bestP=p;bs=[i,j];}                  // placar mais provável
+  }
+  return {la,lb,total:la+lb,pA,pD,pB,over,btts,score:bs,scoreP:bestP};
+}
+
+/* prognóstico de um jogo de fase de grupos */
+function predictGroupGame(a,b){ return matchProbs(expectedGoals(a,b,'g'), expectedGoals(b,a,'g')); }
+
+/* prob. de A vencer os pênaltis — versão ANALÍTICA do shootout() do motor
+   (5 cobranças para cada lado + morte súbita), com os mesmos pA/pB do simulador. */
+function shootoutProbA(a,b){
+  const ta=teams[a], tb=teams[b];
+  const pA=clamp(0.70+(ta.penaltis-50)/250-(tb.goleiro-50)/350,0.55,0.92);
+  const pB=clamp(0.70+(tb.penaltis-50)/250-(ta.goleiro-50)/350,0.55,0.92);
+  const C=[1,5,10,10,5,1];                                   // C(5,k)
+  const bin=p=>{ const v=[]; for(let k=0;k<=5;k++) v.push(C[k]*Math.pow(p,k)*Math.pow(1-p,5-k)); return v; };
+  const ba=bin(pA), bb=bin(pB);
+  let win=0,tie=0;
+  for(let i=0;i<=5;i++)for(let j=0;j<=5;j++){ const p=ba[i]*bb[j]; if(i>j)win+=p; else if(i===j)tie+=p; }
+  const sd=(pA*(1-pB))/(pA*(1-pB)+(1-pA)*pB+1e-12);          // morte súbita: A marca e B erra
+  return win+tie*sd;
+}
+
+/* prognóstico de um jogo de mata-mata: 90' + prorrogação (xG reduzido) + pênaltis */
+const ET_FACTOR=0.34;          // prorrogação ≈ 30'/90' do ritmo (igual ao koMatch)
+function predictKOGame(a,b){
+  const la=expectedGoals(a,b,'k'), lb=expectedGoals(b,a,'k');
+  const reg=matchProbs(la,lb);                       // tempo normal (90')
+  const et=matchProbs(la*ET_FACTOR, lb*ET_FACTOR);   // prorrogação
+  const pPens=reg.pD*et.pD;                           // empate em 90' E empate na prorrogação
+  const sA=shootoutProbA(a,b);
+  const advA=reg.pA + reg.pD*et.pA + pPens*sA;        // avança: vence em 90' OU na prorrogação OU nos pênaltis
+  const advB=reg.pB + reg.pD*et.pB + pPens*(1-sA);    // (advA+advB = 1 por construção)
+  return Object.assign(reg,{etA:et.pA,etD:et.pD,etB:et.pB,pPens,advA,advB,shootoutA:sA});
+}
+
+/* ---------- chave de mata-mata projetada ----------
+   • sem simulação rodada: monta a chave pela Força Final (determinístico).
+   • com simulação rodada: usa as frequências agregadas (1º, 2º e classificação de 3º). */
+function projectBracket(){
+  if(!P) recompute();
+  const g1={}, g2={}, g3={}, g3score={};
+  if(lastResults){
+    const byG={}; GROUP_LETTERS.forEach(g=>byG[g]=[]);
+    lastResults.rows.forEach(r=>byG[r.grupo].push(r));
+    GROUP_LETTERS.forEach(g=>{
+      const arr=byG[g];
+      const first =[...arr].sort((x,y)=>y.pFirst-x.pFirst)[0];                       // maior freq. de 1º
+      const second=[...arr].filter(r=>r.id!==first.id).sort((x,y)=>y.pSecond-x.pSecond)[0]; // maior freq. de 2º
+      const rest  =arr.filter(r=>r.id!==first.id&&r.id!==second.id);
+      const third =[...rest].sort((x,y)=>(y.pAdv-y.pFirst-y.pSecond)-(x.pAdv-x.pFirst-x.pSecond))[0]; // maior freq. de avançar como 3º
+      g1[g]=first.id; g2[g]=second.id; g3[g]=third.id;
+      // freq. de o 3º do grupo se classificar ≈ (soma das chances de avançar do grupo) − 2 vagas garantidas
+      g3score[g]=Math.max(0, arr.reduce((s,r)=>s+r.pAdv,0)-2);
+    });
+  } else {
+    GROUP_LETTERS.forEach(g=>{
+      const arr=groupsIdx[g].map(id=>teams[id]).sort((a,b)=>b.forca-a.forca);
+      g1[g]=arr[0].id; g2[g]=arr[1].id; g3[g]=arr[2].id; g3score[g]=arr[2].forca; // Força do 3º como proxy de classificação
+    });
+  }
+  // 8 melhores terceiros e alocação nos slots permitidos do R32 (mesma função da simulação)
+  const best8G=[...GROUP_LETTERS].sort((a,b)=>g3score[b]-g3score[a]).slice(0,8);
+  const slotG=assignThirds(best8G);
+  // segurança: garante que todo slot de 3º receba um grupo, mesmo que precise relaxar restrições
+  const usados=new Set(Object.values(slotG));
+  const sobra=best8G.filter(g=>!usados.has(g));
+  THIRD_SLOTS.forEach(s=>{ if(!slotG[s.id]) slotG[s.id]=sobra.shift(); });
+  // monta o Round of 32
+  const r32=R32_SLOTS.map(s=>{
+    const pick=side=> side.t==='pos' ? (side.p===1?g1[side.g]:g2[side.g]) : g3[slotG[s.id]];
+    return {id:s.id, hid:pick(s.h), aid:pick(s.a)};
+  });
+  return {basis: lastResults?'sim':'forca', g1,g2,g3,g3score,best8G,slotG,r32};
+}
+
+/* projeta o vencedor de cada confronto (vencedor projetado = maior probabilidade de avançar) */
+function projectKO(list){
+  return list.map(gm=>{
+    const pred=predictKOGame(gm.hid,gm.aid);
+    const win = pred.advA>=pred.advB ? gm.hid : gm.aid;
+    return {id:gm.id, hid:gm.hid, aid:gm.aid, pred, win};
+  });
+}
+function projectKnockout(){
+  const br=projectBracket();
+  const winners={};
+  const adv=src=>{ const r=projectKO(src); r.forEach(g=>winners[g.id]=g.win); return r; };
+  const r32=adv(br.r32);
+  const r16=adv(R16_WIRE.map(w=>({id:w.id,hid:winners[w.h],aid:winners[w.a]})));
+  const qf =adv(QF_WIRE.map(w=>({id:w.id,hid:winners[w.h],aid:winners[w.a]})));
+  const sf =adv(SF_WIRE.map(w=>({id:w.id,hid:winners[w.h],aid:winners[w.a]})));
+  const fin=adv([{id:'FINAL',hid:winners['SF1'],aid:winners['SF2']}]);
+  return {basis:br.basis, bracket:br, r32,r16,qf,sf,fin, champ:winners['FINAL']};
+}
+
+/* ---------- cálculo completo (grupos + mata-mata) + cache ---------- */
+function computePredictions(){
+  recompute(); // garante P coerente com pesos/dados atuais
+  const groups={};
+  GROUP_LETTERS.forEach(g=>{
+    const ids=groupsIdx[g], games=[];
+    for(let i=0;i<ids.length;i++)for(let j=i+1;j<ids.length;j++){
+      const a=ids[i], b=ids[j];
+      games.push(Object.assign({a,b}, predictGroupGame(a,b)));
+    }
+    groups[g]=games;
+  });
+  return {groups, ko:projectKnockout(), base: lastResults?'sim':'forca'};
+}
+
+/* ---------- render ---------- */
+function predBaseLabel(){
+  if(lastResults) return `Base usada: <b>Simulação mais recente: ${lastResults.N.toLocaleString('pt-BR')} Copas rodadas</b> `+
+    `<span class="muted">(${lastResults.when})</span>. A chave projetada usa as frequências de 1º/2º/3º da simulação.`;
+  return `Base usada: <b>Força final atual, antes de rodar simulação</b>. `+
+    `<span class="muted">A chave projetada é determinística (pela Força Final). Rode a simulação para refinar com as frequências de classificação.</span>`;
+}
+function renderPredGroups(D){
+  $('#predGroups').innerHTML=GROUP_LETTERS.map(g=>{
+    const rows=D.groups[g].map(m=>`<tr>
+      <td class="name">${teams[m.a].nome} <span class="muted">×</span> ${teams[m.b].nome}</td>
+      <td>${m.la.toFixed(2)}</td><td>${m.lb.toFixed(2)}</td><td>${m.total.toFixed(2)}</td>
+      <td><b>${m.score[0]}–${m.score[1]}</b> <span class="muted">${pct(m.scoreP)}</span></td>
+      <td>${pct(m.pA)}</td><td>${pct(m.pD)}</td><td>${pct(m.pB)}</td>
+      <td>${pct(m.over)}</td><td>${pct(m.btts)}</td></tr>`).join('');
+    return `<div class="panel"><h4 style="margin:0 0 8px">Grupo ${g}</h4>
+      <div class="scroll" style="max-height:none">
+      <table><thead><tr><th class="name">Jogo</th><th>xG&nbsp;A</th><th>xG&nbsp;B</th><th>Tot</th>
+      <th>Placar +provável</th><th>Vit.&nbsp;A</th><th>Emp.</th><th>Vit.&nbsp;B</th><th>+2.5</th><th>Ambas</th></tr></thead>
+      <tbody>${rows}</tbody></table></div></div>`;
+  }).join('');
+}
+function koRoundPanel(title, sub, games){
+  const mark=(id,win)=> id===win
+    ? `<b style="color:var(--accent)">${teams[id].nome}</b>`
+    : `<span class="muted">${teams[id].nome}</span>`;
+  const rows=games.map(gm=>{ const p=gm.pred, a=gm.hid, b=gm.aid;
+    return `<tr>
+      <td class="name">${mark(a,gm.win)} <span class="muted">×</span> ${mark(b,gm.win)}</td>
+      <td>${p.la.toFixed(2)}</td><td>${p.lb.toFixed(2)}</td>
+      <td><b>${p.score[0]}–${p.score[1]}</b></td>
+      <td>${pct(p.pA)}</td><td>${pct(p.pD)}</td><td>${pct(p.pB)}</td>
+      <td>${pct(p.over)}</td><td>${pct(p.btts)}</td>
+      <td>${pct(p.pPens)}</td>
+      <td class="${gm.win===a?'win':''}">${pct(p.advA)}</td>
+      <td class="${gm.win===b?'win':''}">${pct(p.advB)}</td></tr>`;
+  }).join('');
+  return `<div class="panel"><h4 style="margin:0 0 2px">${title}</h4>
+    <div class="note" style="margin-bottom:8px">${sub}</div>
+    <div class="scroll" style="max-height:none">
+    <table><thead><tr><th class="name">Confronto <span class="muted">(negrito = avança)</span></th>
+    <th>xG&nbsp;A</th><th>xG&nbsp;B</th><th>Placar</th>
+    <th>Vit.A&nbsp;90'</th><th>Emp.&nbsp;90'</th><th>Vit.B&nbsp;90'</th><th>+2.5</th><th>Ambas</th>
+    <th>Pênaltis</th><th>Avança&nbsp;A</th><th>Avança&nbsp;B</th></tr></thead>
+    <tbody>${rows}</tbody></table></div></div>`;
+}
+function renderPredKO(D){
+  const champ=teams[D.ko.champ];
+  $('#predChamp').innerHTML=`<div class="champbanner"><div style="font-size:30px">🏆</div>
+    <div><div class="muted">Campeã projetada ${D.base==='sim'?'(chave da simulação)':'(chave pela Força Final)'}</div>
+    <div class="big">${champ.nome}</div></div></div>`;
+  $('#predKO').innerHTML=[
+    koRoundPanel('32 avos de final','16 confrontos — os vencedores projetados seguem para as oitavas.',D.ko.r32),
+    koRoundPanel('Oitavas de final','8 confrontos projetados a partir dos vencedores do R32.',D.ko.r16),
+    koRoundPanel('Quartas de final','4 confrontos projetados.',D.ko.qf),
+    koRoundPanel('Semifinais','2 confrontos projetados.',D.ko.sf),
+    koRoundPanel('Final','Decisão do título.',D.ko.fin)
+  ].join('');
+}
+function renderPredictions(){
+  _predData=computePredictions();
+  $('#predBase').innerHTML=predBaseLabel();
+  renderPredGroups(_predData);
+  renderPredKO(_predData);
+}
+/* recalcula automaticamente quando pesos/dados mudam, se a aba estiver aberta (debounce) */
+function schedulePredictions(){
+  if(activeTab!=='pred') return;        // se não está visível, será recalculado ao abrir a aba
+  clearTimeout(_predTimer); _predTimer=setTimeout(renderPredictions,180);
+}
+function switchTab(tab){
+  activeTab=tab;
+  document.querySelectorAll('.tabbtn').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));
+  $('#pane-sim').classList.toggle('hide',tab!=='sim');
+  $('#pane-pred').classList.toggle('hide',tab!=='pred');
+  if(tab==='pred') renderPredictions();  // recalcula sempre ao abrir a aba
+}
+
+/* ---------- exportar prognósticos em CSV ---------- */
+function exportPredCSV(){
+  const D=_predData||computePredictions();
+  const num=x=>x.toFixed(3), p2=x=>(x*100).toFixed(2);
+  let csv='Fase;Chave;EquipeA;EquipeB;xG_A;xG_B;TotalGols;PlacarProvavel;ProbPlacar_Pct;VitA_Pct;Empate_Pct;VitB_Pct;Over2.5_Pct;AmbasMarcam_Pct;Penaltis_Pct;AvancaA_Pct;AvancaB_Pct\n';
+  GROUP_LETTERS.forEach(g=>D.groups[g].forEach(m=>{
+    csv+=`Grupos;Grupo ${g};${teams[m.a].nome};${teams[m.b].nome};${num(m.la)};${num(m.lb)};${num(m.total)};`+
+         `${m.score[0]}-${m.score[1]};${p2(m.scoreP)};${p2(m.pA)};${p2(m.pD)};${p2(m.pB)};${p2(m.over)};${p2(m.btts)};;;\n`;
+  }));
+  [['32 avos',D.ko.r32],['Oitavas',D.ko.r16],['Quartas',D.ko.qf],['Semifinal',D.ko.sf],['Final',D.ko.fin]]
+  .forEach(([nm,gs])=>gs.forEach(gm=>{ const p=gm.pred;
+    csv+=`${nm};${gm.id};${teams[gm.hid].nome};${teams[gm.aid].nome};${num(p.la)};${num(p.lb)};${num(p.total)};`+
+         `${p.score[0]}-${p.score[1]};${p2(p.scoreP)};${p2(p.pA)};${p2(p.pD)};${p2(p.pB)};${p2(p.over)};${p2(p.btts)};`+
+         `${p2(p.pPens)};${p2(p.advA)};${p2(p.advB)}\n`;
+  }));
+  download('prognosticos_copa2026.csv', csv, 'text/csv');
+}
+
+/* =====================================================================================
    WIRING + INICIALIZAÇÃO
    ===================================================================================== */
 function wire(){
@@ -984,11 +1282,11 @@ function wire(){
   $('#btnRun').addEventListener('click',()=>{ $('#log').textContent=''; runSimulations(N_SIMS); });
   $('#btnAdv').addEventListener('click',e=>{ showAdvanced=!showAdvanced; e.target.textContent=(showAdvanced?'– Ocultar':'+ Mostrar')+' colunas avançadas'; renderTeamsTable(); });
   $('#btnWnorm').addEventListener('click',()=>{ const s=W.w1+W.w2+W.w3+W.w4+W.w5+W.w6+W.w7; if(!s)return;
-    ['w1','w2','w3','w4','w5','w6','w7'].forEach(k=>W[k]=Math.round(W[k]*100/s)); renderWeights(); recompute(); updateForca(); });
-  $('#btnWreset').addEventListener('click',()=>{ W=Object.assign({},W_DEFAULT); renderWeights(); recompute(); updateForca(); });
+    ['w1','w2','w3','w4','w5','w6','w7'].forEach(k=>W[k]=Math.round(W[k]*100/s)); renderWeights(); recompute(); updateForca(); schedulePredictions(); });
+  $('#btnWreset').addEventListener('click',()=>{ W=Object.assign({},W_DEFAULT); renderWeights(); recompute(); updateForca(); schedulePredictions(); });
   ['cBase','cAtk','cDef','cHost'].forEach(id=>$('#'+id).addEventListener('input',()=>{
     CFG.base=+$('#cBase').value; CFG.katk=+$('#cAtk').value; CFG.kdef=+$('#cDef').value; CFG.host=+$('#cHost').value;
-    recompute(); updateForca();
+    recompute(); updateForca(); schedulePredictions();
   }));
   $('#btnSave').addEventListener('click',saveLocal);
   $('#btnRestore').addEventListener('click',restoreDefaults);
@@ -996,6 +1294,10 @@ function wire(){
   $('#btnExpCsv').addEventListener('click',exportCSV);
   $('#btnImpJson').addEventListener('click',()=>$('#fileJson').click());
   $('#fileJson').addEventListener('change',e=>{ if(e.target.files[0])importJSON(e.target.files[0]); e.target.value=''; });
+  // abas e prognósticos
+  document.querySelectorAll('.tabbtn').forEach(b=>b.addEventListener('click',()=>switchTab(b.dataset.tab)));
+  $('#btnPredUpd').addEventListener('click',renderPredictions);
+  $('#btnPredCsv').addEventListener('click',exportPredCSV);
 }
 function init(){
   try{ const saved=localStorage.getItem(STORAGE_KEY);
