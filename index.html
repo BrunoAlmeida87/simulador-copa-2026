@@ -1,0 +1,1015 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Simulador Copa do Mundo 2026 — Modelo Quantitativo</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --panel2:#1c2230; --line:#2a3344;
+    --txt:#e6edf3; --muted:#9aa7b8; --accent:#3fb950; --accent2:#388bfd;
+    --warn:#d29922; --bad:#f85149; --gold:#e3b341; --br:#1f9e4a;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.45;font-size:14px}
+  header{padding:22px 18px;background:linear-gradient(135deg,#13351f,#0d1117 70%);border-bottom:1px solid var(--line)}
+  h1{margin:0 0 4px;font-size:24px}
+  h2{font-size:18px;margin:26px 0 10px;border-left:4px solid var(--accent);padding-left:10px}
+  h3{font-size:15px;margin:16px 0 8px;color:var(--accent2)}
+  .sub{color:var(--muted);font-size:13px;max-width:1100px}
+  .wrap{max-width:1240px;margin:0 auto;padding:0 14px 60px}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:14px 0}
+  .grid{display:grid;gap:14px}
+  .row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+  button{background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:8px;
+    padding:9px 14px;font-size:13px;cursor:pointer;font-weight:600;transition:.15s}
+  button:hover{border-color:var(--accent);background:#222b3a}
+  button.primary{background:var(--br);border-color:#2bbd5a;color:#fff}
+  button.primary:hover{background:#26ae53}
+  button.sim{min-width:78px}
+  button.sim.active{background:var(--accent2);border-color:#58a6ff;color:#fff}
+  button.ghost{background:transparent}
+  .pill{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700}
+  .pill.ok{background:#12351f;color:#56d364;border:1px solid #1f6f37}
+  .pill.est{background:#3a2d10;color:#e3b341;border:1px solid #6e5418}
+  .pill.op{background:#162a45;color:#79c0ff;border:1px solid #1f4a7a}
+  table{border-collapse:collapse;width:100%;font-size:12.5px}
+  th,td{border:1px solid var(--line);padding:5px 7px;text-align:center;white-space:nowrap}
+  th{background:#0f1620;position:sticky;top:0;z-index:2;font-size:11.5px}
+  td.name,th.name{text-align:left;position:sticky;left:0;background:#10161f;z-index:1;font-weight:600}
+  tr:nth-child(even) td{background:#11161d}
+  tr:nth-child(even) td.name{background:#10161f}
+  .scroll{overflow:auto;max-height:560px;border:1px solid var(--line);border-radius:10px}
+  input.cell{width:52px;background:#0c1118;color:var(--txt);border:1px solid #243042;border-radius:5px;
+    padding:3px 4px;text-align:center;font-size:12px}
+  input.cell:focus{outline:none;border-color:var(--accent2)}
+  input.obs{width:230px;text-align:left}
+  .forca{font-weight:800}
+  .barwrap{background:#0c1118;border-radius:6px;height:14px;overflow:hidden;border:1px solid #243042;min-width:60px}
+  .bar{height:100%;background:linear-gradient(90deg,#1f9e4a,#3fb950)}
+  .barTitle{height:100%;background:linear-gradient(90deg,#9a7d12,#e3b341)}
+  label.fld{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted)}
+  label.fld input,label.fld select{background:#0c1118;color:var(--txt);border:1px solid #243042;border-radius:6px;padding:6px}
+  .wgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
+  .wbox{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px}
+  .wbox input[type=range]{width:100%}
+  .wval{font-weight:800;color:var(--accent)}
+  .status{font-size:13px;color:var(--muted);min-height:18px}
+  progress{width:100%;height:16px}
+  #log{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px;background:#0a0e14;border:1px solid var(--line);
+    border-radius:8px;padding:10px;height:150px;overflow:auto;white-space:pre-wrap;color:#aeb9c7}
+  .legend{font-size:12px;color:var(--muted);display:flex;gap:14px;flex-wrap:wrap;margin-top:8px}
+  .cardgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:12px}
+  .card{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px}
+  .card h4{margin:0 0 6px;font-size:14px}
+  .muted{color:var(--muted)}
+  .big{font-size:30px;font-weight:800}
+  .tag{font-size:11px;padding:2px 7px;border-radius:6px;background:#21304a;color:#9fd0ff;margin-left:6px}
+  .tag.fav{background:#143d23;color:#62e08a}
+  .tag.risk{background:#3d1717;color:#ff9a92}
+  .brbox{border:1px solid var(--br);background:linear-gradient(135deg,#0f2a17,#161b22);border-radius:12px;padding:16px;margin-top:10px}
+  .kv{display:flex;justify-content:space-between;border-bottom:1px dashed #243042;padding:4px 0;font-size:13px}
+  .hide{display:none}
+  a{color:var(--accent2)}
+  .note{font-size:12px;color:var(--muted);font-style:italic}
+  .ribbon{display:inline-block;font-size:11px;font-weight:800;padding:3px 10px;border-radius:20px}
+  details summary{cursor:pointer;color:var(--accent2);font-weight:600;margin:6px 0}
+  .toprow td{font-size:13px}
+  @media(max-width:640px){ input.obs{width:150px} .big{font-size:24px} }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap" style="padding-bottom:0">
+    <h1>⚽ Simulador da Copa do Mundo 2026 <span class="ribbon" style="background:#143d23;color:#62e08a">v1.0 · modelo explicável</span></h1>
+    <p class="sub">
+      Modelo quantitativo (gols esperados + Poisson + Monte Carlo) sobre o <b>chaveamento oficial da FIFA</b>
+      (48 seleções, 12 grupos, 2 primeiros + 8 melhores terceiros, mata-mata de 32 a 1).
+      Edite qualquer dado, ajuste os pesos, insira notícias e rode milhares de simulações.
+      <b>Nada aqui é certeza</b>: são probabilidades estimadas que dependem de lesões, escalação e chaveamento.
+    </p>
+    <div class="legend">
+      <span><span class="pill ok">confirmado</span> grupos/chaveamento (sorteio FIFA dez/2025) e ranking FIFA abr/2026</span>
+      <span><span class="pill op">provável</span> escalações e notícias (jun/2026)</span>
+      <span><span class="pill est">estimativa</span> atributos numéricos 0–100 (calibrados pelo modelo)</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <!-- ============ CONTROLES ============ -->
+  <div class="panel">
+    <div class="row" style="justify-content:space-between">
+      <div class="row">
+        <b>Nº de simulações:</b>
+        <button class="sim" data-n="1000">1.000</button>
+        <button class="sim active" data-n="10000">10.000</button>
+        <button class="sim" data-n="50000">50.000</button>
+        <button class="sim" data-n="100000">100.000</button>
+      </div>
+      <div class="row">
+        <button id="btnRun" class="primary">▶ Rodar simulação</button>
+      </div>
+    </div>
+    <div style="margin-top:10px">
+      <progress id="prog" value="0" max="100"></progress>
+      <div class="status" id="status">Pronto. Clique em “Rodar simulação”. 100.000 sims podem levar dezenas de segundos.</div>
+    </div>
+  </div>
+
+  <!-- ============ PESOS ============ -->
+  <h2>1 · Pesos do modelo <span class="note">(somam 100% — editáveis; recalculam a Força Final)</span></h2>
+  <div class="panel">
+    <div class="wgrid" id="weights"></div>
+    <div class="row" style="margin-top:10px">
+      <span class="status" id="wsum"></span>
+      <button class="ghost" id="btnWnorm">Normalizar para 100%</button>
+      <button class="ghost" id="btnWreset">Pesos padrão</button>
+    </div>
+    <details>
+      <summary>Parâmetros avançados do motor de gols (Poisson)</summary>
+      <div class="wgrid" style="margin-top:8px">
+        <label class="fld">Gols-base por equipe (μ)
+          <input type="number" id="cBase" step="0.01" value="1.32"></label>
+        <label class="fld">Sensibilidade do ataque (K_ATK)
+          <input type="number" id="cAtk" step="0.05" value="1.55"></label>
+        <label class="fld">Sensibilidade da defesa (K_DEF)
+          <input type="number" id="cDef" step="0.05" value="1.55"></label>
+        <label class="fld">Bônus de anfitrião (casa)
+          <input type="number" id="cHost" step="0.01" value="1.06"></label>
+      </div>
+      <p class="note">Anfitriões (México, Canadá, EUA) recebem o bônus de casa em todos os jogos, pois toda a Copa é na América do Norte.</p>
+    </details>
+  </div>
+
+  <!-- ============ BASE DE DADOS ============ -->
+  <h2>2 · Base de dados das 48 seleções <span class="note">(clique nos números para editar)</span></h2>
+  <div class="panel">
+    <div class="row" style="justify-content:space-between;margin-bottom:8px">
+      <div class="row">
+        <button id="btnAdv" class="ghost">+ Mostrar colunas avançadas</button>
+        <span class="note">Disp.=disponibilidade (100 = sem desfalques) · Ritmo=ritmo de jogo · NotAdj=ajuste por notícias (±) · Ajuste=ajuste manual (±)</span>
+      </div>
+    </div>
+    <div class="scroll">
+      <table id="tbl"><thead id="thead"></thead><tbody id="tbody"></tbody></table>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <button id="btnSave" class="primary">💾 Salvar no navegador</button>
+      <button id="btnRestore">↩ Restaurar dados originais</button>
+      <button id="btnExpJson">⬇ Exportar base (JSON)</button>
+      <button id="btnImpJson">⬆ Importar base (JSON)</button>
+      <button id="btnExpCsv">⬇ Exportar resultados (CSV)</button>
+      <input type="file" id="fileJson" accept="application/json" class="hide">
+    </div>
+  </div>
+
+  <!-- ============ LOG ============ -->
+  <h2>3 · Log de execução</h2>
+  <div id="log"></div>
+
+  <!-- ============ RESULTADOS ============ -->
+  <h2>4 · Resultados — probabilidade por fase</h2>
+  <div class="note" style="margin-bottom:6px">“Avançar” e “32 avos” são o mesmo evento em 2026 (quem passa do grupo já está na fase de 32). As demais colunas são fases vencidas.</div>
+  <div class="scroll"><table id="res"><thead id="resHead"></thead><tbody id="resBody"></tbody></table></div>
+
+  <!-- ============ TOP 10 ============ -->
+  <h2>5 · Top 10 favoritos ao título</h2>
+  <div class="scroll"><table id="top10"><thead id="t10Head"></thead><tbody id="t10Body"></tbody></table></div>
+
+  <!-- ============ MERCADO ============ -->
+  <h2>6 · Modelo × Mercado de apostas <span class="note">(calibração, não verdade absoluta)</span></h2>
+  <div id="market" class="panel"><p class="muted">Rode a simulação para comparar com as odds implícitas.</p></div>
+
+  <!-- ============ GRUPOS ============ -->
+  <h2>7 · Análise dos grupos</h2>
+  <div id="groups" class="cardgrid"></div>
+
+  <!-- ============ CAMINHOS ============ -->
+  <h2>8 · Caminhos prováveis das favoritas</h2>
+  <div id="paths" class="cardgrid"></div>
+
+  <!-- ============ BRASIL ============ -->
+  <h2>9 · 🇧🇷 Análise especial do Brasil</h2>
+  <div id="brazil" class="brbox"><p class="muted">Rode a simulação para gerar a análise do Brasil com os números atuais da base.</p></div>
+
+  <!-- ============ METODOLOGIA ============ -->
+  <h2>10 · Metodologia, limitações e fontes</h2>
+  <div class="panel" id="methodology"></div>
+
+</div>
+
+<script>
+"use strict";
+/* =====================================================================================
+   SIMULADOR COPA DO MUNDO 2026 — modelo quantitativo explicável
+   -------------------------------------------------------------------------------------
+   PIPELINE:
+     base de dados (DNA) -> buildTeams() -> recompute() (Força Final + multiplicadores)
+       -> runSimulations(N): para cada simulação
+            simula 72 jogos de grupo (Poisson) -> classifica 12 grupos
+            -> escolhe 8 melhores terceiros -> monta o R32 oficial
+            -> mata-mata (90' + prorrogação + pênaltis) até a final
+       -> agrega contagens -> probabilidades por fase -> renderiza tudo.
+
+   PROVENIÊNCIA DOS DADOS (ver seção 10 e os "pills" no topo):
+     - Grupos e chaveamento: SORTEIO OFICIAL FIFA (05/dez/2025). [confirmado]
+     - Ranking FIFA: divulgação de 01/abr/2026 (Fra1, Esp2, Arg3, Ing4, Por5, Bra6...). [confirmado]
+     - Notícias/lesões: imprensa esportiva (ESPN, FIFA, Al Jazeera, Sky, Reuters/AP), jun/2026. [provável]
+     - Atributos 0–100 (ataque, defesa, elenco etc.): ESTIMATIVA do autor do modelo,
+       calibrada pelo ranking, valor de elenco e mercado de apostas. [estimativa — edite à vontade]
+   ===================================================================================== */
+
+/* ---------- utilidades numéricas ---------- */
+const clamp=(x,a,b)=>x<a?a:(x>b?b:x);
+const n100=x=>clamp(x,0,100)/100;                 // 0..100 -> 0..1
+const eloPct=elo=>clamp((elo-1500)/600,0,1);      // 1500..2100 -> 0..1
+const fifaPct=r=>clamp(1-(r-1)/85,0,1);           // rank 1 -> ~1 ; rank 86 -> 0
+const round1=x=>Math.round(x*10)/10;
+const pct=x=>(x*100).toFixed(1)+'%';
+
+/* ---------- ANFITRIÕES (jogam toda a Copa na América do Norte) ---------- */
+const HOSTS = new Set(['México','Canadá','EUA']);
+
+/* =====================================================================================
+   DNA das 48 seleções (entrada compacta; buildTeams() expande para a base editável).
+   Campos: n=nome, g=grupo, fifa=ranking FIFA, elo=força tipo-Elo,
+   att=ataque, def=defesa, form=momento recente, squad=qualidade do elenco,
+   depth=qualidade do banco, coach=técnico, gk=goleiro, exp=experiência em Copas,
+   ko=histórico em mata-mata, disp=disponibilidade (100=sem lesões), ritmo=ritmo de jogo,
+   news=ajuste por notícias (±), pens=(opcional) qualidade de pênaltis, obs=observação.
+   ===================================================================================== */
+const TEAMS_DNA = [
+  // Grupo A
+  {n:'México',g:'A',fifa:15,elo:1800,att:74,def:72,form:70,squad:72,depth:66,coach:70,gk:74,exp:88,ko:60,disp:90,ritmo:80,news:2,obs:'Anfitriã (fator casa). Geração Giménez/Álvarez; pressão de jogar em casa.'},
+  {n:'África do Sul',g:'A',fifa:58,elo:1680,att:60,def:60,form:70,squad:58,depth:52,coach:60,gk:62,exp:55,ko:45,disp:88,ritmo:75,news:1,obs:'Bafana surpreendeu nas Eliminatórias da CAF; jovem e veloz.'},
+  {n:'Coreia do Sul',g:'A',fifa:23,elo:1780,att:70,def:64,form:66,squad:68,depth:58,coach:64,gk:64,exp:78,ko:50,disp:86,ritmo:78,news:1,obs:'Son lidera; transição rápida, defesa é o ponto fraco.'},
+  {n:'Rep. Tcheca',g:'A',fifa:43,elo:1730,att:64,def:66,form:60,squad:63,depth:56,coach:60,gk:72,exp:70,ko:48,disp:85,ritmo:74,news:0,obs:'Tradição de bons goleiros; equipe equilibrada e disciplinada.'},
+  // Grupo B
+  {n:'Canadá',g:'B',fifa:30,elo:1790,att:72,def:68,form:70,squad:70,depth:60,coach:72,gk:66,exp:50,ko:45,disp:86,ritmo:80,news:2,obs:'Anfitriã. David e Davies; Marsch dá intensidade. Davies recuperado de lesão.'},
+  {n:'Bósnia e Herzegovina',g:'B',fifa:74,elo:1720,att:64,def:60,form:66,squad:60,depth:50,coach:58,gk:60,exp:40,ko:38,disp:85,ritmo:74,news:1,obs:'Džeko veterano; classificou na repescagem europeia.'},
+  {n:'Catar',g:'B',fifa:51,elo:1700,att:60,def:62,form:60,squad:58,depth:52,coach:62,gk:64,exp:45,ko:40,disp:88,ritmo:76,news:0,obs:'Bicampeã asiática; organizada, mas pouco poder de fogo.'},
+  {n:'Suíça',g:'B',fifa:20,elo:1820,att:70,def:74,form:68,squad:70,depth:60,coach:66,gk:72,exp:80,ko:58,disp:86,ritmo:78,news:1,obs:'Defensivamente sólida; Xhaka organiza; sempre competitiva em Copas.'},
+  // Grupo C — BRASIL
+  {n:'Brasil',g:'C',fifa:6,elo:2000,att:88,def:84,form:70,squad:86,depth:78,coach:86,gk:84,exp:98,ko:82,disp:62,ritmo:70,news:-8,pens:70,obs:'DESFALQUES: Rodrygo (ruptura de LCA), Militão (cirurgia), Estêvão (lesão muscular). Neymar convocado aos 34 mas com estiramento grau 2 na panturrilha — dúvida para a estreia. Vini Jr. é a referência; zaga Gabriel-Marquinhos forte; Ancelotti no comando.'},
+  {n:'Marrocos',g:'C',fifa:12,elo:1885,att:78,def:82,form:76,squad:78,depth:70,coach:76,gk:78,exp:72,ko:74,disp:86,ritmo:80,news:3,obs:'Semifinalista em 2022. Bloco defensivo dos melhores do torneio; Hakimi, En-Nesyri, Regragui. Principal rival do Brasil no grupo.'},
+  {n:'Haiti',g:'C',fifa:83,elo:1590,att:56,def:52,form:64,squad:50,depth:42,coach:54,gk:54,exp:30,ko:25,disp:85,ritmo:72,news:1,obs:'Estreia histórica; surpresa da Concacaf, sem tradição em Copas.'},
+  {n:'Escócia',g:'C',fifa:38,elo:1730,att:64,def:66,form:64,squad:64,depth:54,coach:64,gk:66,exp:50,ko:42,disp:84,ritmo:76,news:0,obs:'Robertson e McTominay; volta à Copa após décadas, raça e bola parada.'},
+  // Grupo D
+  {n:'EUA',g:'D',fifa:16,elo:1815,att:74,def:70,form:70,squad:72,depth:62,coach:72,gk:72,exp:70,ko:52,disp:86,ritmo:80,news:2,obs:'Anfitriã. Pulisic, Weah; Pochettino. Geração europeia, fator casa relevante.'},
+  {n:'Turquia',g:'D',fifa:26,elo:1785,att:74,def:66,form:70,squad:70,depth:60,coach:66,gk:70,exp:60,ko:48,disp:85,ritmo:78,news:2,obs:'Arda Güler, Çalhanoğlu, Kökçü; geração jovem e criativa.'},
+  {n:'Austrália',g:'D',fifa:24,elo:1740,att:60,def:66,form:64,squad:60,depth:52,coach:62,gk:68,exp:65,ko:45,disp:85,ritmo:76,news:0,obs:'Socceroos físicos e organizados; Ryan no gol.'},
+  {n:'Paraguai',g:'D',fifa:41,elo:1730,att:62,def:70,form:66,squad:62,depth:54,coach:66,gk:68,exp:60,ko:46,disp:86,ritmo:76,news:1,obs:'Defesa muito organizada sob Alfaro; difícil de bater.'},
+  // Grupo E
+  {n:'Alemanha',g:'E',fifa:9,elo:1965,att:86,def:80,form:76,squad:84,depth:76,coach:76,gk:80,exp:96,ko:78,disp:85,ritmo:80,news:3,obs:'Musiala, Wirtz, Kimmich; Neuer volta da aposentadoria; elenco profundo. Tradição de crescer no torneio.'},
+  {n:'Curaçao',g:'E',fifa:82,elo:1600,att:56,def:54,form:66,squad:50,depth:40,coach:56,gk:54,exp:25,ko:22,disp:85,ritmo:70,news:2,obs:'Menor país (em população) a se classificar; estreia histórica; Advocaat técnico.'},
+  {n:'Costa do Marfim',g:'E',fifa:40,elo:1760,att:70,def:68,form:68,squad:68,depth:58,coach:64,gk:64,exp:58,ko:50,disp:85,ritmo:76,news:1,obs:'Campeã africana de 2023; atletismo e ataque direto.'},
+  {n:'Equador',g:'E',fifa:22,elo:1790,att:66,def:76,form:70,squad:68,depth:58,coach:66,gk:72,exp:62,ko:48,disp:85,ritmo:78,news:1,obs:'Defesa muito sólida, jovem e física; Beccacece dá identidade.'},
+  // Grupo F
+  {n:'Países Baixos',g:'F',fifa:7,elo:1985,att:84,def:80,form:74,squad:84,depth:74,coach:74,gk:78,exp:90,ko:70,disp:86,ritmo:80,news:2,obs:'Van Dijk, Gakpo, Frenkie de Jong, Xavi Simons; qualidade técnica e profundidade.'},
+  {n:'Japão',g:'F',fifa:19,elo:1825,att:76,def:70,form:78,squad:74,depth:66,coach:70,gk:70,exp:72,ko:50,disp:88,ritmo:82,news:3,obs:'Primeira seleção a se classificar; Mitoma, Kubo, Kamada; ótima fase e intensidade.'},
+  {n:'Suécia',g:'F',fifa:36,elo:1790,att:80,def:64,form:72,squad:70,depth:58,coach:64,gk:66,exp:70,ko:46,disp:84,ritmo:78,news:2,obs:'Ataque temível: Isak + Gyökeres. Defesa é a dúvida; veio pela repescagem.'},
+  {n:'Tunísia',g:'F',fifa:49,elo:1700,att:60,def:68,form:62,squad:58,depth:50,coach:60,gk:64,exp:58,ko:40,disp:85,ritmo:74,news:0,obs:'Disciplinada e defensiva; dificulta favoritos.'},
+  // Grupo G
+  {n:'Bélgica',g:'G',fifa:8,elo:1910,att:82,def:74,form:70,squad:80,depth:70,coach:72,gk:72,exp:88,ko:66,disp:84,ritmo:78,news:1,obs:'Courtois no gol (elite); De Bruyne veterano, Doku, Lukaku. Geração madura.'},
+  {n:'Egito',g:'G',fifa:32,elo:1760,att:72,def:66,form:70,squad:66,depth:54,coach:64,gk:66,exp:55,ko:44,disp:84,ritmo:76,news:1,obs:'Salah lidera; muito dependente dele, mas decisivo.'},
+  {n:'Irã',g:'G',fifa:21,elo:1740,att:68,def:68,form:66,squad:64,depth:54,coach:64,gk:66,exp:62,ko:42,disp:84,ritmo:74,news:0,obs:'Taremi e Azmoun; experiente e fisicamente forte.'},
+  {n:'Nova Zelândia',g:'G',fifa:86,elo:1600,att:54,def:58,form:64,squad:50,depth:42,coach:56,gk:58,exp:40,ko:28,disp:86,ritmo:72,news:1,obs:'Domina a Oceania; forte fisicamente e na bola aérea.'},
+  // Grupo H
+  {n:'Espanha',g:'H',fifa:2,elo:2090,att:90,def:86,form:86,squad:90,depth:84,coach:84,gk:80,exp:94,ko:80,disp:80,ritmo:82,news:4,obs:'Campeã europeia, ~28 jogos invicta. Yamal (lesão na coxa) é dúvida para a estreia, mas deve voltar. Pedri, Rodri, Nico Williams. Favorita do mercado.'},
+  {n:'Cabo Verde',g:'H',fifa:70,elo:1640,att:60,def:60,form:70,squad:54,depth:44,coach:58,gk:58,exp:28,ko:26,disp:85,ritmo:74,news:2,obs:'Estreia histórica; "Tubarões Azuis" surpreenderam na eliminatória africana.'},
+  {n:'Arábia Saudita',g:'H',fifa:57,elo:1670,att:58,def:62,form:62,squad:56,depth:48,coach:62,gk:64,exp:55,ko:38,disp:85,ritmo:74,news:0,obs:'Defensiva; lembrança da vitória sobre a Argentina em 2022.'},
+  {n:'Uruguai',g:'H',fifa:11,elo:1875,att:78,def:78,form:72,squad:78,depth:66,coach:78,gk:74,exp:86,ko:64,disp:84,ritmo:78,news:2,obs:'Bielsa; Núñez, Valverde, Araújo, Pellistri. Geração forte e agressiva.'},
+  // Grupo I
+  {n:'França',g:'I',fifa:1,elo:2080,att:92,def:86,form:82,squad:92,depth:88,coach:82,gk:80,exp:96,ko:84,disp:86,ritmo:82,news:4,pens:74,obs:'Nº 1 do ranking. Mbappé + Dembélé (Bola de Ouro); elenco profundíssimo; Saliba recuperado. Co-favorita do mercado.'},
+  {n:'Senegal',g:'I',fifa:18,elo:1820,att:76,def:76,form:70,squad:74,depth:64,coach:68,gk:70,exp:66,ko:54,disp:84,ritmo:78,news:1,obs:'Físico e talento; Koulibaly, Mendy; ataque variado.'},
+  {n:'Iraque',g:'I',fifa:58,elo:1640,att:58,def:60,form:64,squad:54,depth:46,coach:60,gk:60,exp:35,ko:30,disp:85,ritmo:72,news:1,obs:'Classificou via repescagem; surpresa asiática.'},
+  {n:'Noruega',g:'I',fifa:28,elo:1810,att:84,def:66,form:80,squad:72,depth:58,coach:66,gk:64,exp:35,ko:38,disp:86,ritmo:82,news:3,obs:'Haaland + Ødegaard; volta à Copa após 28 anos. Ataque explosivo, defesa é a dúvida.'},
+  // Grupo J
+  {n:'Argentina',g:'J',fifa:3,elo:2040,att:86,def:84,form:80,squad:84,depth:76,coach:86,gk:78,exp:96,ko:86,disp:84,ritmo:80,news:3,pens:84,obs:'Atual campeã. Messi (38), Julián Álvarez, Lautaro; Emi Martínez gigante nos pênaltis; mentalidade de mata-mata e entrosamento.'},
+  {n:'Argélia',g:'J',fifa:37,elo:1740,att:72,def:64,form:68,squad:66,depth:54,coach:64,gk:64,exp:50,ko:40,disp:84,ritmo:76,news:1,obs:'Mahrez; talento ofensivo, mas oscila defensivamente.'},
+  {n:'Áustria',g:'J',fifa:25,elo:1790,att:72,def:70,form:72,squad:70,depth:60,coach:70,gk:68,exp:55,ko:44,disp:85,ritmo:78,news:2,obs:'Rangnick; pressão intensa, Sabitzer e Arnautović.'},
+  {n:'Jordânia',g:'J',fifa:62,elo:1620,att:56,def:60,form:66,squad:52,depth:44,coach:60,gk:60,exp:25,ko:30,disp:85,ritmo:74,news:1,obs:'Estreia histórica; vice da Copa da Ásia 2023.'},
+  // Grupo K
+  {n:'Portugal',g:'K',fifa:5,elo:1990,att:88,def:80,form:78,squad:88,depth:82,coach:80,gk:78,exp:90,ko:70,disp:85,ritmo:80,news:2,obs:'Ronaldo (41) na 6ª Copa. Geração de ouro: B. Fernandes, Vitinha, B. Silva, Leão, Nuno Mendes; elenco profundo. Roberto Martínez.'},
+  {n:'Colômbia',g:'K',fifa:14,elo:1860,att:80,def:72,form:76,squad:76,depth:64,coach:72,gk:70,exp:64,ko:52,disp:85,ritmo:80,news:3,obs:'Luis Díaz em alta (Bayern); James Rodríguez criativo. Dark horse perigoso.'},
+  {n:'Rep. Dem. Congo',g:'K',fifa:56,elo:1700,att:66,def:64,form:68,squad:60,depth:50,coach:62,gk:62,exp:35,ko:34,disp:84,ritmo:74,news:1,obs:'Classificou na repescagem intercontinental; atletismo.'},
+  {n:'Uzbequistão',g:'K',fifa:53,elo:1660,att:60,def:64,form:66,squad:56,depth:48,coach:62,gk:62,exp:25,ko:28,disp:85,ritmo:74,news:1,obs:'Estreia histórica; defesa organizada, projeto de longo prazo.'},
+  // Grupo L
+  {n:'Inglaterra',g:'L',fifa:4,elo:2010,att:88,def:82,form:80,squad:88,depth:82,coach:80,gk:78,exp:90,ko:68,disp:86,ritmo:80,news:3,obs:'Kane, Bellingham, Saka, Rice; Tuchel. Elenco fortíssimo; busca o 1º título desde 1966.'},
+  {n:'Croácia',g:'L',fifa:10,elo:1890,att:76,def:74,form:70,squad:74,depth:62,coach:72,gk:72,exp:86,ko:80,disp:84,ritmo:76,news:1,pens:78,obs:'Modrić (40) lenda; experiência de mata-mata enorme (final 2018, semi 2022); Gvardiol, Sučić. Livaković bom em pênaltis.'},
+  {n:'Gana',g:'L',fifa:44,elo:1720,att:68,def:62,form:66,squad:62,depth:52,coach:62,gk:60,exp:60,ko:44,disp:84,ritmo:74,news:0,obs:'Black Stars; Kudus; ataque rápido, defesa vulnerável.'},
+  {n:'Panamá',g:'L',fifa:39,elo:1720,att:64,def:66,form:70,squad:60,depth:50,coach:64,gk:64,exp:40,ko:38,disp:85,ritmo:78,news:1,obs:'Surpresa da Concacaf; bem organizada e competitiva.'}
+];
+
+/* =====================================================================================
+   CHAVEAMENTO OFICIAL FWC26 (extraído do calendário FIFA).
+   Slots do R32: cada confronto recebe 1º/2º de um grupo ou o "melhor 3º" de um conjunto.
+   ===================================================================================== */
+const GROUP_LETTERS = ['A','B','C','D','E','F','G','H','I','J','K','L'];
+
+// Confrontos do Round of 32 (O1..O16). t=tipo: 'pos' (1º/2º de grupo) ou '3rd' (melhor terceiro).
+const R32_SLOTS = [
+  {id:'O1', h:{t:'pos',p:2,g:'A'}, a:{t:'pos',p:2,g:'B'}},
+  {id:'O2', h:{t:'pos',p:1,g:'C'}, a:{t:'pos',p:2,g:'F'}},
+  {id:'O3', h:{t:'pos',p:1,g:'E'}, a:{t:'3rd',from:'ABCDF'}},
+  {id:'O4', h:{t:'pos',p:1,g:'F'}, a:{t:'pos',p:2,g:'C'}},
+  {id:'O5', h:{t:'pos',p:2,g:'E'}, a:{t:'pos',p:2,g:'I'}},
+  {id:'O6', h:{t:'pos',p:1,g:'I'}, a:{t:'3rd',from:'CDFGH'}},
+  {id:'O7', h:{t:'pos',p:1,g:'A'}, a:{t:'3rd',from:'CEFHI'}},
+  {id:'O8', h:{t:'pos',p:1,g:'L'}, a:{t:'3rd',from:'EHIJK'}},
+  {id:'O9', h:{t:'pos',p:1,g:'G'}, a:{t:'3rd',from:'AEHIJ'}},
+  {id:'O10',h:{t:'pos',p:1,g:'D'}, a:{t:'3rd',from:'BEFIJ'}},
+  {id:'O11',h:{t:'pos',p:1,g:'H'}, a:{t:'pos',p:2,g:'J'}},
+  {id:'O12',h:{t:'pos',p:2,g:'K'}, a:{t:'pos',p:2,g:'L'}},
+  {id:'O13',h:{t:'pos',p:1,g:'B'}, a:{t:'3rd',from:'EFGIJ'}},
+  {id:'O14',h:{t:'pos',p:2,g:'D'}, a:{t:'pos',p:2,g:'G'}},
+  {id:'O15',h:{t:'pos',p:1,g:'J'}, a:{t:'pos',p:2,g:'H'}},
+  {id:'O16',h:{t:'pos',p:1,g:'K'}, a:{t:'3rd',from:'DEIJL'}}
+];
+// Avanço do mata-mata (vencedores). Espelha o bracket visual oficial.
+const R16_WIRE = [
+  {id:'Q1',h:'O3',a:'O6'},{id:'Q2',h:'O1',a:'O4'},{id:'Q3',h:'O2',a:'O5'},{id:'Q4',h:'O7',a:'O8'},
+  {id:'Q5',h:'O12',a:'O11'},{id:'Q6',h:'O10',a:'O9'},{id:'Q7',h:'O15',a:'O14'},{id:'Q8',h:'O13',a:'O16'}
+];
+const QF_WIRE = [{id:'S1',h:'Q1',a:'Q2'},{id:'S2',h:'Q5',a:'Q6'},{id:'S3',h:'Q3',a:'Q4'},{id:'S4',h:'Q7',a:'Q8'}];
+const SF_WIRE = [{id:'SF1',h:'S1',a:'S2'},{id:'SF2',h:'S3',a:'S4'}];
+
+/* ---------- estado global ---------- */
+let teams = [];                 // base editável (objetos completos)
+let lastResults = null;         // último resultado agregado
+let N_SIMS = 10000;
+let showAdvanced = false;
+const STORAGE_KEY = 'simuladorCopa2026_v1';
+
+/* =====================================================================================
+   buildTeams(): expande o DNA na base editável completa, derivando os sub-atributos
+   que não foram digitados à mão (marcados como "estimativa do modelo").
+   ===================================================================================== */
+function buildTeams(dna){
+  return dna.map((d,i)=>{
+    const ep = eloPct(d.elo)*100;
+    const titular   = Math.round(clamp(0.6*d.squad + 0.4*((d.att+d.def)/2),0,100));
+    const ult24     = Math.round(clamp(0.55*d.form + 0.45*ep,0,100));
+    const elimin    = Math.round(clamp(0.50*d.form + 0.50*ep,0,100));
+    const valor     = Math.round(Math.pow(eloPct(d.elo),2.2)*1500); // € mi aprox (estimativa)
+    const estab     = Math.round(clamp(0.6*d.coach + 0.4*d.ko,0,100));
+    const entros    = Math.round(clamp(0.45*d.exp + 0.30*estab + 0.25*d.disp,0,100));
+    const pens      = d.pens!=null ? d.pens : Math.round(clamp(0.5*d.ko + 0.3*d.att + 20,0,100));
+    const setpiece  = Math.round(clamp(0.45*d.att + 0.35*d.def + 12,0,100));
+    const criacao   = Math.round(clamp(0.7*d.att + 0.3*d.squad,0,100));
+    const transic   = Math.round(clamp(0.6*d.def + 0.4*d.form,0,100));
+    const lowblock  = Math.round(clamp(0.55*d.att + 0.25*d.squad + 0.20*criacao,0,100));
+    return {
+      id:i, nome:d.n, grupo:d.g, fifa:d.fifa, elo:d.elo,
+      ataque:d.att, defesa:d.def, momento:d.form, ult24m:ult24, eliminatorias:elimin,
+      elenco:d.squad, titular:titular, banco:d.depth, valor:valor,
+      expCopas:d.exp, histKO:d.ko, tecnico:d.coach, estabilidade:estab, entrosamento:entros,
+      goleiro:d.gk, penaltis:pens, bolaParada:setpiece, criacao:criacao,
+      transicoes:transic, defesaBaixa:lowblock,
+      disp:d.disp, ritmo:d.ritmo, news:d.news, ajuste:0,
+      obs:d.obs, forca:0
+    };
+  });
+}
+
+/* ---------- colunas da tabela editável ---------- */
+const COLS_BASIC = [
+  ['grupo','Gr',0],['fifa','FIFA',1],['elo','Elo',1],['ataque','Ata',1],['defesa','Def',1],
+  ['momento','Mom',1],['elenco','Elenco',1],['banco','Banco',1],['tecnico','Téc',1],
+  ['goleiro','GK',1],['penaltis','Pên',1],['expCopas','ExpC',1],['histKO','MtMt',1],
+  ['disp','Disp',1],['ritmo','Ritmo',1],['news','NotAdj',1],['ajuste','Ajuste',1]
+];
+const COLS_ADV = [
+  ['ult24m','Últ24m',1],['eliminatorias','Elim',1],['titular','Titular',1],['valor','€mi',1],
+  ['estabilidade','Estab',1],['entrosamento','Entr',1],['bolaParada','BolaP',1],
+  ['criacao','Criac',1],['transicoes','Trans',1],['defesaBaixa','vsBaixa',1]
+];
+
+/* =====================================================================================
+   ====== PARTE 2 (motor de cálculo) e PARTE 3 (UI) são adicionadas abaixo ======
+   ===================================================================================== */
+/* =====================================================================================
+   PARTE 2 — MOTOR DE CÁLCULO (força final, gols esperados, simulação Monte Carlo)
+   ===================================================================================== */
+
+/* pesos do modelo (%) e constantes do motor — preenchidos pela UI */
+let W = {w1:20,w2:20,w3:20,w4:15,w5:10,w6:10,w7:5};
+const W_DEFAULT = {w1:20,w2:20,w3:20,w4:15,w5:10,w6:10,w7:5};
+const W_META = [
+  ['w1','Força atual (Elo + ranking FIFA)'],
+  ['w2','Desempenho recente (ponderado)'],
+  ['w3','Qualidade dos jogadores disponíveis'],
+  ['w4','Escalação, lesões e notícias'],
+  ['w5','Força ofensiva/defensiva (estatística)'],
+  ['w6','Caminho/contexto de mata-mata'],
+  ['w7','Histórico em Copas e experiência']
+];
+let CFG = {base:1.32, katk:1.55, kdef:1.55, host:1.06};
+
+/* arrays pré-computados por simulação (índice = id da seleção) */
+let P = null; // {forca,aG,dG,aK,dK,ctx}
+let groupsIdx = {}; // {A:[ids], ...}
+const THIRD_SLOTS = R32_SLOTS.filter(s=>s.a.t==='3rd').map(s=>({id:s.id,from:s.a.from}));
+
+/* ---------------------------------------------------------------------------
+   recompute(): calcula a Força Final de cada seleção a partir dos pesos
+   e pré-calcula os multiplicadores de ataque/defesa usados na simulação.
+   Blocos (cada um 0..1) -> combinação ponderada -> Força (0..100).
+   Lesões/notícias entram no bloco B4 e, portanto, JÁ afetam ataque, defesa
+   e gols esperados (evita dupla contagem). O "ajuste manual" soma direto.
+--------------------------------------------------------------------------- */
+function recompute(){
+  const den = W.w1+W.w2+W.w3+W.w4+W.w5+W.w7; // bloco "caminho" (w6) entra como bônus de mata-mata
+  const forca=[],aG=[],dG=[],aK=[],dK=[],ctx=[];
+  groupsIdx={}; GROUP_LETTERS.forEach(g=>groupsIdx[g]=[]);
+  for(const t of teams){
+    const B1 = 0.65*eloPct(t.elo) + 0.35*fifaPct(t.fifa);
+    const B2 = (n100(t.momento)+n100(t.ult24m)+n100(t.eliminatorias))/3;
+    const B3 = (n100(t.elenco)+n100(t.titular)+n100(t.banco)+clamp(t.valor/1400,0,1))/4;
+    const newsN = clamp(0.5 + t.news/20, 0, 1);
+    const B4 = 0.45*n100(t.disp) + 0.25*n100(t.ritmo) + 0.30*newsN;
+    const B5 = (n100(t.ataque)+n100(t.defesa)+n100(t.bolaParada)+n100(t.criacao)+n100(t.transicoes)+n100(t.defesaBaixa))/6;
+    const B7 = (n100(t.expCopas)+n100(t.histKO))/2;
+    let S = (W.w1*B1 + W.w2*B2 + W.w3*B3 + W.w4*B4 + W.w5*B5 + W.w7*B7)/den;
+    S = clamp(S + t.ajuste/100, 0.03, 0.99);          // ajuste manual: ±10 ≈ ±0.10 de força
+    t.forca = Math.round(S*100);
+
+    // bônus de mata-mata (goleiro, pênaltis, experiência) escalado pelo peso w6
+    const koQ = (n100(t.goleiro)+n100(t.penaltis)+n100(t.histKO)+n100(t.expCopas))/4;
+    const Sko = clamp(S + (W.w6/100)*(koQ-0.5)*0.5, 0.03, 0.99);
+
+    const offSpec = (n100(t.ataque)+n100(t.criacao)+n100(t.bolaParada)+n100(t.defesaBaixa))/4;
+    const defSpec = (n100(t.defesa)+n100(t.transicoes)+n100(t.goleiro))/3;
+    const AIg = 0.55*S   + 0.45*offSpec, DIg = 0.55*S   + 0.45*defSpec;
+    const AIk = 0.55*Sko + 0.45*offSpec, DIk = 0.55*Sko + 0.45*defSpec;
+
+    aG[t.id] = Math.exp(CFG.katk*(AIg-0.5));   // fator de ataque (grupo)
+    dG[t.id] = Math.exp(CFG.kdef*(0.5-DIg));   // fragilidade defensiva sofrida (grupo)
+    aK[t.id] = Math.exp(CFG.katk*(AIk-0.5));   // ataque (mata-mata, com bônus KO)
+    dK[t.id] = Math.exp(CFG.kdef*(0.5-DIk));
+    // contexto: pequeno fator de momento + bônus de casa (anfitriões)
+    const fMom = Math.exp(0.10*(n100(t.momento)-0.5));
+    const fHost = HOSTS.has(t.nome) ? CFG.host : 1;
+    ctx[t.id] = fMom*fHost;
+    forca[t.id]=t.forca;
+    groupsIdx[t.grupo].push(t.id);
+  }
+  P = {forca,aG,dG,aK,dK,ctx};
+}
+
+/* ---------- amostragem de gols por Poisson (algoritmo de Knuth) ---------- */
+function pois(l){
+  if(l<=0) return 0; if(l>10) l=10;
+  const L=Math.exp(-l); let k=0,p=1;
+  do{ k++; p*=Math.random(); }while(p>L);
+  return k-1;
+}
+
+/* gols esperados de A contra B (fase 'g' = grupos | 'k' = mata-mata) */
+function lambda(a,b,phase){
+  const A = phase==='k'?P.aK:P.aG, D = phase==='k'?P.dK:P.dG;
+  return CFG.base * A[a] * D[b] * P.ctx[a];
+}
+
+/* ---------- pênaltis: vantagem para bons cobradores e bons goleiros ---------- */
+function shootout(a,b){
+  const ta=teams[a], tb=teams[b];
+  const pA = clamp(0.70 + (ta.penaltis-50)/250 - (tb.goleiro-50)/350, 0.55, 0.92);
+  const pB = clamp(0.70 + (tb.penaltis-50)/250 - (ta.goleiro-50)/350, 0.55, 0.92);
+  let ga=0,gb=0;
+  for(let i=0;i<5;i++){ if(Math.random()<pA)ga++; if(Math.random()<pB)gb++; }
+  while(ga===gb){ const xa=Math.random()<pA?1:0, xb=Math.random()<pB?1:0; ga+=xa; gb+=xb; }
+  return ga>gb?a:b;
+}
+
+/* jogo de mata-mata: 90' -> prorrogação -> pênaltis. Retorna o id do vencedor. */
+function koMatch(a,b){
+  let ga=pois(lambda(a,b,'k')), gb=pois(lambda(b,a,'k'));
+  if(ga!==gb) return ga>gb?a:b;
+  // prorrogação (~1/3 do tempo, ritmo levemente menor)
+  ga+=pois(lambda(a,b,'k')*0.34); gb+=pois(lambda(b,a,'k')*0.34);
+  if(ga!==gb) return ga>gb?a:b;
+  return shootout(a,b);
+}
+
+/* ---------- classificação de um grupo (critérios FIFA aproximados) ---------- */
+function classifyGroup(ids){
+  const n=ids.length;
+  const st=ids.map(id=>({id,pts:0,gf:0,ga:0,gd:0}));
+  const idx={}; ids.forEach((id,k)=>idx[id]=k);
+  const score={}; // resultado direto para desempate por confronto
+  for(let i=0;i<n;i++)for(let j=i+1;j<n;j++){
+    const A=ids[i],B=ids[j];
+    const ga=pois(lambda(A,B,'g')), gb=pois(lambda(B,A,'g'));
+    score[A+'_'+B]=[ga,gb];
+    st[i].gf+=ga; st[i].ga+=gb; st[j].gf+=gb; st[j].ga+=ga;
+    if(ga>gb)st[i].pts+=3; else if(gb>ga)st[j].pts+=3; else {st[i].pts++; st[j].pts++;}
+  }
+  st.forEach(s=>s.gd=s.gf-s.ga);
+  st.sort((x,y)=> y.pts-x.pts || y.gd-x.gd || y.gf-x.gf || Math.random()-0.5);
+  // desempate por confronto direto entre empatados em pts/gd/gf
+  for(let i=0;i<n;){
+    let j=i+1;
+    while(j<n && st[j].pts===st[i].pts && st[j].gd===st[i].gd && st[j].gf===st[i].gf) j++;
+    if(j-i>1){
+      const sub=st.slice(i,j);
+      sub.forEach(s=>{s.h2h=0;});
+      for(let x=0;x<sub.length;x++)for(let y=0;y<sub.length;y++){ if(x===y)continue;
+        const A=sub[x].id,B=sub[y].id, key=A<B?A+'_'+B:B+'_'+A, r=score[key];
+        if(!r)continue; const ga=A<B?r[0]:r[1], gb=A<B?r[1]:r[0];
+        if(ga>gb)sub[x].h2h+=3; else if(ga===gb)sub[x].h2h+=1;
+      }
+      sub.sort((p,q)=> q.h2h-p.h2h || Math.random()-0.5);
+      for(let k=0;k<sub.length;k++) st[i+k]=sub[k];
+    }
+    i=j;
+  }
+  return st; // [1º,2º,3º,4º]
+}
+
+/* ---------- matching: alocar os 8 melhores 3ºs aos slots permitidos ---------- */
+function assignThirds(thirdGroups){
+  // thirdGroups: array de letras (grupos cujo 3º se classificou). Backtracking com MRV.
+  const slots = THIRD_SLOTS.map(s=>({id:s.id, cand:THIRD_SLOTS.length?[...s.from].filter(g=>thirdGroups.includes(g)):[]}));
+  const used={}; const out={};
+  function bt(k){
+    if(k===slots.length) return true;
+    // escolhe o slot ainda não resolvido com menos candidatos (MRV) — aqui em ordem fixa basta
+    const s=slots[k];
+    const cands=s.cand.filter(g=>!used[g]);
+    for(const g of cands){ used[g]=1; out[s.id]=g; if(bt(k+1))return true; delete used[g]; }
+    return false;
+  }
+  // ordena slots por menos candidatos para acelerar
+  slots.sort((a,b)=>a.cand.length-b.cand.length);
+  if(bt(0)) return out;
+  // fallback (não deve ocorrer no formato oficial): aloca greedily
+  const o2={}, u2={};
+  for(const s of slots){ const g=s.cand.find(x=>!u2[x]); if(g){u2[g]=1;o2[s.id]=g;} }
+  return o2;
+}
+
+/* =====================================================================================
+   runTournamentOnce(agg, watch, paths): simula UMA Copa inteira e acumula em 'agg'.
+   stage: 0=eliminada nos grupos · 1=R32(avançou) · 2=oitavas · 3=quartas · 4=semi · 5=final · 6=campeã
+   ===================================================================================== */
+function runTournamentOnce(agg, watchSet, paths){
+  const stage=new Int8Array(48);
+  const standings={}; const thirds=[];
+  // 1) fase de grupos
+  for(const g of GROUP_LETTERS){
+    const st=classifyGroup(groupsIdx[g]);
+    standings[g]=st;
+    agg.first[st[0].id]++; agg.second[st[1].id]++;
+    stage[st[0].id]=1; stage[st[1].id]=1;
+    thirds.push({id:st[2].id, g, pts:st[2].pts, gd:st[2].gd, gf:st[2].gf});
+  }
+  // 2) melhores terceiros
+  thirds.sort((x,y)=> y.pts-x.pts || y.gd-x.gd || y.gf-x.gf || Math.random()-0.5);
+  const best8=thirds.slice(0,8);
+  best8.forEach(t=>{ stage[t.id]=1; });
+  const thirdByGroup={}; best8.forEach(t=>thirdByGroup[t.g]=t.id);
+  const slotG=assignThirds(best8.map(t=>t.g));
+  // 3) monta o Round of 32
+  const winners={};
+  const r32=R32_SLOTS.map(s=>{
+    const hid = s.h.t==='pos' ? standings[s.h.g][s.h.p-1].id : thirdByGroup[slotG[s.id]];
+    const aid = s.a.t==='pos' ? standings[s.a.g][s.a.p-1].id : thirdByGroup[slotG[s.id]];
+    return {id:s.id,hid,aid};
+  });
+  // 4) mata-mata
+  function play(list, roundKey, nextStage){
+    for(const gm of list){
+      const a=gm.hid, b=gm.aid;
+      if(watchSet){ if(watchSet.has(a))pushPath(paths,a,roundKey,teams[b].nome); if(watchSet.has(b))pushPath(paths,b,roundKey,teams[a].nome); }
+      const w=koMatch(a,b); winners[gm.id]=w; if(stage[w]<nextStage)stage[w]=nextStage;
+    }
+  }
+  play(r32,'R32',2);
+  const r16=R16_WIRE.map(w=>({id:w.id,hid:winners[w.h],aid:winners[w.a]}));
+  play(r16,'R16',3);
+  const qf=QF_WIRE.map(w=>({id:w.id,hid:winners[w.h],aid:winners[w.a]}));
+  play(qf,'QF',4);
+  const sf=SF_WIRE.map(w=>({id:w.id,hid:winners[w.h],aid:winners[w.a]}));
+  play(sf,'SF',5);
+  const champ=koMatch(winners['SF1'],winners['SF2']);
+  // registra adversário da final para os finalistas observados
+  const fa=winners['SF1'], fb=winners['SF2'];
+  if(watchSet){ if(watchSet.has(fa))pushPath(paths,fa,'FINAL',teams[fb].nome); if(watchSet.has(fb))pushPath(paths,fb,'FINAL',teams[fa].nome); }
+  stage[fa]=Math.max(stage[fa],5); stage[fb]=Math.max(stage[fb],5);
+  stage[champ]=6;
+  // 5) acumula
+  for(let i=0;i<48;i++){
+    const s=stage[i];
+    if(s>=1)agg.r32[i]++; if(s>=2)agg.r16[i]++; if(s>=3)agg.qf[i]++;
+    if(s>=4)agg.sf[i]++; if(s>=5)agg.fin[i]++; if(s===6)agg.title[i]++;
+  }
+}
+function pushPath(paths,id,round,oppName){
+  const m=paths[id][round]; m[oppName]=(m[oppName]||0)+1;
+}
+
+/* =====================================================================================
+   runSimulations(N): roda N torneios em blocos (mantém a UI responsiva) e agrega.
+   ===================================================================================== */
+function runSimulations(N){
+  recompute();
+  const agg={r32:new Int32Array(48),r16:new Int32Array(48),qf:new Int32Array(48),
+    sf:new Int32Array(48),fin:new Int32Array(48),title:new Int32Array(48),
+    first:new Int32Array(48),second:new Int32Array(48)};
+  // watchlist de caminhos: 12 mais fortes + Brasil
+  const order=[...teams].sort((a,b)=>b.forca-a.forca);
+  const watchIds=new Set(order.slice(0,12).map(t=>t.id));
+  const bra=teams.find(t=>t.nome==='Brasil'); if(bra)watchIds.add(bra.id);
+  const paths={}; watchIds.forEach(id=>paths[id]={R32:{},R16:{},QF:{},SF:{},FINAL:{}});
+
+  log('Iniciando '+N.toLocaleString('pt-BR')+' simulações...');
+  log('Pesos: '+W_META.map((m,i)=>m[0].toUpperCase()+'='+W['w'+(i+1)]+'%').join('  '));
+  const t0=performance.now();
+  const chunk=Math.max(200, Math.floor(N/120));
+  let done=0;
+  setStatus('Simulando...'); setProg(0);
+
+  function step(){
+    const end=Math.min(done+chunk,N);
+    for(;done<end;done++) runTournamentOnce(agg,watchIds,paths);
+    const p=done/N; setProg(p*100);
+    setStatus('Simulando... '+done.toLocaleString('pt-BR')+' / '+N.toLocaleString('pt-BR')+' ('+(p*100).toFixed(0)+'%)');
+    if(done<N){ setTimeout(step,0); }
+    else finish();
+  }
+  function finish(){
+    const dt=((performance.now()-t0)/1000).toFixed(1);
+    log('Concluído em '+dt+'s. Agregando probabilidades...');
+    const rows=teams.map(t=>({
+      id:t.id, nome:t.nome, grupo:t.grupo, forca:t.forca,
+      pAdv:agg.r32[t.id]/N, pR16:agg.r16[t.id]/N, pQF:agg.qf[t.id]/N,
+      pSF:agg.sf[t.id]/N, pFin:agg.fin[t.id]/N, pTit:agg.title[t.id]/N,
+      pFirst:agg.first[t.id]/N, pSecond:agg.second[t.id]/N
+    }));
+    lastResults={N, rows, paths, watchIds:[...watchIds], when:new Date().toLocaleString('pt-BR')};
+    setProg(100); setStatus('Pronto — '+N.toLocaleString('pt-BR')+' simulações em '+dt+'s.');
+    log('Campeã mais provável no modelo: '+[...rows].sort((a,b)=>b.pTit-a.pTit)[0].nome);
+    renderAll();
+  }
+  step();
+}
+/* =====================================================================================
+   PARTE 3 — INTERFACE, RENDERIZAÇÃO, IMPORT/EXPORT E ANÁLISE DO BRASIL
+   ===================================================================================== */
+const $=s=>document.querySelector(s);
+function log(m){ const el=$('#log'); el.textContent+=('['+new Date().toLocaleTimeString('pt-BR')+'] '+m+'\n'); el.scrollTop=el.scrollHeight; }
+function setStatus(m){ $('#status').textContent=m; }
+function setProg(v){ $('#prog').value=v; }
+
+/* ---------- pesos ---------- */
+function renderWeights(){
+  const box=$('#weights'); box.innerHTML='';
+  W_META.forEach((m,i)=>{
+    const key='w'+(i+1);
+    const d=document.createElement('div'); d.className='wbox';
+    d.innerHTML=`<div style="display:flex;justify-content:space-between"><b>${m[0].toUpperCase()}</b><span class="wval" id="wv-${key}">${W[key]}%</span></div>
+      <div class="muted" style="font-size:11.5px;min-height:30px">${m[1]}</div>
+      <input type="range" min="0" max="40" step="1" value="${W[key]}" data-w="${key}">`;
+    box.appendChild(d);
+  });
+  box.querySelectorAll('input[type=range]').forEach(r=>{
+    r.addEventListener('input',e=>{
+      const k=e.target.dataset.w; W[k]=+e.target.value; $('#wv-'+k).textContent=W[k]+'%';
+      updateWsum(); recompute(); updateForca();
+    });
+  });
+  updateWsum();
+}
+function updateWsum(){
+  const s=W.w1+W.w2+W.w3+W.w4+W.w5+W.w6+W.w7;
+  $('#wsum').innerHTML='Soma dos pesos: <b style="color:'+(s===100?'#56d364':'#e3b341')+'">'+s+'%</b> '+(s===100?'✓':'(ideal = 100%)');
+}
+
+/* ---------- tabela editável ---------- */
+function cols(){ return showAdvanced ? COLS_BASIC.concat(COLS_ADV) : COLS_BASIC; }
+function renderTeamsTable(){
+  const C=cols();
+  $('#thead').innerHTML='<tr><th class="name">Seleção</th>'+
+    C.map(c=>`<th title="${c[0]}">${c[1]}</th>`).join('')+
+    '<th>Força</th><th style="text-align:left">Observações / notícias</th></tr>';
+  const tb=$('#tbody');
+  tb.innerHTML=teams.map(t=>{
+    const cells=C.map(c=>{
+      const v=t[c[0]];
+      if(c[0]==='grupo') return `<td>${v}</td>`;
+      return `<td><input class="cell" type="number" data-id="${t.id}" data-f="${c[0]}" value="${v}"></td>`;
+    }).join('');
+    return `<tr><td class="name">${t.nome}</td>${cells}
+      <td id="f-${t.id}"></td>
+      <td><input class="cell obs" type="text" data-id="${t.id}" data-f="obs" value="${(t.obs||'').replace(/"/g,'&quot;')}"></td></tr>`;
+  }).join('');
+  tb.querySelectorAll('input').forEach(inp=>{
+    inp.addEventListener('input',e=>{
+      const id=+e.target.dataset.id, f=e.target.dataset.f;
+      teams[id][f] = (f==='obs') ? e.target.value : (parseFloat(e.target.value)||0);
+      if(f!=='obs'){ recompute(); updateForca(); }
+    });
+  });
+  updateForca();
+}
+function updateForca(){
+  if(!P) recompute();
+  teams.forEach(t=>{
+    const el=$('#f-'+t.id); if(!el)return;
+    el.innerHTML=`<div style="display:flex;align-items:center;gap:6px"><span class="forca">${t.forca}</span>
+      <div class="barwrap" style="flex:1"><div class="bar" style="width:${t.forca}%"></div></div></div>`;
+  });
+}
+
+/* ---------- helpers de texto ---------- */
+function strengthOf(t){
+  const c=[[t.ataque,'ataque potente'],[t.defesa,'defesa sólida'],[t.goleiro,'goleiro de elite'],
+    [t.elenco,'elenco profundo'],[t.histKO,'traquejo de mata-mata'],[t.momento,'bom momento'],[t.banco,'banco forte']];
+  c.sort((a,b)=>b[0]-a[0]); return c[0][1];
+}
+function riskOf(t){
+  if(t.disp<72) return 'desfalques/lesões importantes';
+  if(t.news<=-5) return 'notícias negativas recentes';
+  const c=[[t.defesa,'defesa vulnerável'],[t.banco,'banco curto'],[t.expCopas,'pouca experiência em Copa'],
+    [t.histKO,'pouco mata-mata'],[t.goleiro,'gol é dúvida']];
+  c.sort((a,b)=>a[0]-b[0]); return c[0][1];
+}
+function obsShort(t){
+  if(t.disp<70) return '⚠ desfalques pesam';
+  if(t.forca>=82) return '★ favorita real';
+  if(t.forca>=74) return 'candidata forte';
+  if(t.forca>=66) return 'briga por oitavas';
+  if(t.forca>=58) return 'azarã de luxo';
+  return 'estreante/zebra';
+}
+
+/* ---------- render principal ---------- */
+function renderAll(){
+  if(!lastResults) return;
+  renderResults(); renderTop10(); renderMarket(); renderGroups(); renderPaths(); renderBrazil();
+}
+function renderResults(){
+  const rows=[...lastResults.rows].sort((a,b)=> b.pTit-a.pTit || b.pAdv-a.pAdv);
+  $('#resHead').innerHTML='<tr><th>#</th><th class="name">Seleção</th><th>Gr</th>'+
+    '<th>Avançar</th><th>32 avos</th><th>Oitavas</th><th>Quartas</th><th>Semi</th><th>Final</th><th>Título</th><th>Força</th><th style="text-align:left">Observação</th></tr>';
+  $('#resBody').innerHTML=rows.map((r,i)=>{
+    const t=teams[r.id];
+    return `<tr><td>${i+1}</td><td class="name">${r.nome}</td><td>${r.grupo}</td>
+      <td>${pct(r.pAdv)}</td><td>${pct(r.pAdv)}</td><td>${pct(r.pR16)}</td><td>${pct(r.pQF)}</td>
+      <td>${pct(r.pSF)}</td><td>${pct(r.pFin)}</td>
+      <td style="font-weight:800;color:#e3b341">${pct(r.pTit)}</td>
+      <td><div class="barwrap"><div class="bar" style="width:${r.forca}%"></div></div></td>
+      <td style="text-align:left">${obsShort(t)}</td></tr>`;
+  }).join('');
+}
+function renderTop10(){
+  const rows=[...lastResults.rows].sort((a,b)=>b.pTit-a.pTit).slice(0,10);
+  $('#t10Head').innerHTML='<tr><th>#</th><th class="name">Seleção</th><th>Título</th><th>Final</th><th>Semi</th>'+
+    '<th style="text-align:left">Principal força</th><th style="text-align:left">Principal risco</th></tr>';
+  $('#t10Body').innerHTML=rows.map((r,i)=>{
+    const t=teams[r.id];
+    return `<tr class="toprow"><td>${i+1}</td><td class="name">${r.nome}</td>
+      <td><div class="barwrap" style="display:inline-block;width:90px;vertical-align:middle"><div class="barTitle" style="width:${Math.min(100,r.pTit*100*4)}%"></div></div> <b>${pct(r.pTit)}</b></td>
+      <td>${pct(r.pFin)}</td><td>${pct(r.pSF)}</td>
+      <td style="text-align:left;color:#62e08a">${strengthOf(t)}</td>
+      <td style="text-align:left;color:#ff9a92">${riskOf(t)}</td></tr>`;
+  }).join('');
+}
+
+/* mercado (implícito, com overround) — referência de calibração, jun/2026 (DraftKings/FanDuel) */
+const MARKET={'Espanha':18.0,'França':17.0,'Inglaterra':13.0,'Brasil':10.5,'Portugal':10.5,
+  'Argentina':10.0,'Alemanha':8.0,'Países Baixos':6.0,'Bélgica':3.0,'Croácia':2.5,'Marrocos':2.5,'Uruguai':2.0,'Colômbia':2.0};
+function renderMarket(){
+  const map={}; lastResults.rows.forEach(r=>map[r.nome]=r.pTit);
+  const sumM=Object.values(MARKET).reduce((a,b)=>a+b,0);
+  const keys=Object.keys(MARKET).sort((a,b)=>MARKET[b]-MARKET[a]);
+  let html='<table><thead><tr><th class="name">Seleção</th><th>Mercado (implícito)</th><th>Modelo</th><th>Leitura do modelo</th></tr></thead><tbody>';
+  keys.forEach(k=>{
+    const m=MARKET[k]/100, mod=map[k]||0;
+    let read='alinhado', col='#9aa7b8';
+    if(mod>m*1.30){read='modelo vê ACIMA — mercado pode subestimar';col='#62e08a';}
+    else if(mod<m*0.70){read='modelo vê ABAIXO — mercado pode superestimar';col='#ff9a92';}
+    html+=`<tr><td class="name">${k}</td><td>${(m*100).toFixed(1)}%</td><td><b>${pct(mod)}</b></td><td style="text-align:left;color:${col}">${read}</td></tr>`;
+  });
+  html+='</tbody></table>';
+  html+=`<p class="note">As porcentagens do mercado somam ${sumM.toFixed(0)}% (acima de 100% por causa da margem/overround das casas). O modelo é "sem vig",
+   então tende a ser mais baixo no agregado. Use a coluna "Leitura" apenas como sinal de divergência, não como verdade. Fonte: odds compiladas de DraftKings/FanDuel, jun/2026.</p>`;
+  $('#market').innerHTML=html;
+}
+
+function topOpp(m){ let best=null,bc=-1,tot=0; for(const k in m){tot+=m[k]; if(m[k]>bc){bc=m[k];best=k;}} return best?{name:best,share:bc/tot}:null; }
+function renderGroups(){
+  const byGroup={}; GROUP_LETTERS.forEach(g=>byGroup[g]=[]);
+  lastResults.rows.forEach(r=>byGroup[r.grupo].push(r));
+  $('#groups').innerHTML=GROUP_LETTERS.map(g=>{
+    const arr=byGroup[g].slice().sort((a,b)=>b.pAdv-a.pAdv);
+    const byForca=byGroup[g].slice().sort((a,b)=>b.forca-a.forca);
+    const fav=byGroup[g].slice().sort((a,b)=>b.pFirst-a.pFirst);
+    const zebra=arr.slice(2).reduce((s,r)=>s+r.pAdv,0); // chance de um "de baixo" avançar
+    const key=byForca[0].nome+' × '+byForca[1].nome;
+    return `<div class="card"><h4>Grupo ${g} <span class="tag fav">${fav[0].nome}</span></h4>
+      <div class="kv"><span>Favorito (1º)</span><b>${fav[0].nome} · ${pct(fav[0].pFirst)}</b></div>
+      <div class="kv"><span>2º mais provável</span><b>${fav[1].nome} · ${pct(fav[1].pFirst)}</b></div>
+      <div style="margin:6px 0">${arr.map(r=>`<div style="display:flex;justify-content:space-between;font-size:12px"><span>${r.nome}</span><span class="muted">avança ${pct(r.pAdv)}</span></div>`).join('')}</div>
+      <div class="kv"><span>Risco de zebra</span><b>${pct(zebra)}</b></div>
+      <div class="kv"><span>Jogo-chave</span><b style="font-size:12px">${key}</b></div></div>`;
+  }).join('');
+}
+
+function pathDifficulty(id){
+  const pp=lastResults.paths[id]; if(!pp)return null;
+  const rounds=['R32','R16','QF','SF','FINAL']; const out=[]; let sum=0,cnt=0;
+  rounds.forEach(rk=>{
+    const t=topOpp(pp[rk]); if(t){ const opp=teams.find(x=>x.nome===t.name); out.push({rk,name:t.name,share:t.share,forca:opp?opp.forca:60}); sum+=opp?opp.forca:60; cnt++; }
+  });
+  return {steps:out, dif: cnt?Math.round(sum/cnt):0};
+}
+function renderPaths(){
+  const favs=[...lastResults.rows].sort((a,b)=>b.pTit-a.pTit).slice(0,6).map(r=>r.id);
+  const bra=teams.find(t=>t.nome==='Brasil'); if(bra&&!favs.includes(bra.id))favs.push(bra.id);
+  const lbl={R32:'32 avos',R16:'Oitavas',QF:'Quartas',SF:'Semi',FINAL:'Final'};
+  $('#paths').innerHTML=favs.map(id=>{
+    const d=pathDifficulty(id); const t=teams[id];
+    if(!d) return '';
+    const difTxt=d.dif>=78?'muito difícil':d.dif>=70?'difícil':d.dif>=62?'média':'mais acessível';
+    return `<div class="card"><h4>${t.nome} <span class="tag">caminho ${difTxt} (${d.dif}/100)</span></h4>
+      ${d.steps.map(s=>`<div class="kv"><span>${lbl[s.rk]}</span><b>${s.name} <span class="muted">(${(s.share*100).toFixed(0)}%)</span></b></div>`).join('')}</div>`;
+  }).join('');
+}
+
+/* ---------- confronto direto (1 jogo) por Monte Carlo rápido ---------- */
+function h2hWin(a,b,n){ n=n||3000; if(!P)recompute(); let w=0; for(let i=0;i<n;i++){ if(koMatch(a,b)===a)w++; } return w/n; }
+
+function renderBrazil(){
+  const r=lastResults.rows.find(x=>x.nome==='Brasil'); if(!r){return;}
+  const t=teams[r.id];
+  // classificação dinâmica pela probabilidade de título
+  let cls,clsCol,clsWhy;
+  if(r.pTit>=0.15){cls='Favorito real';clsCol='#62e08a';}
+  else if(r.pTit>=0.085){cls='Candidato forte';clsCol='#9fd0ff';}
+  else if(r.pTit>=0.04){cls='Candidato médio';clsCol='#e3b341';}
+  else {cls='Azarão de luxo';clsCol='#ff9a92';}
+  clsWhy=`Com a base atual (Força ${t.forca}, com Rodrygo, Militão e Estêvão fora e Neymar limitado), o modelo dá ${pct(r.pTit)} de título e ${pct(r.pSF)} de semifinal. `+
+    `A zaga (Gabriel–Marquinhos), o goleiro (Alisson) e o banco mantêm o Brasil competitivo, mas a perda de criadores e velocidade no ataque reduz o teto. Por isso a classificação "${cls}".`;
+  // adversários prováveis
+  const d=pathDifficulty(r.id); const lbl={R32:'32 avos',R16:'Oitavas',QF:'Quartas',SF:'Semi',FINAL:'Final'};
+  const advHtml = d? d.steps.map(s=>`<div class="kv"><span>${lbl[s.rk]}</span><b>${s.name} <span class="muted">(${(s.share*100).toFixed(0)}%)</span></b></div>`).join('') : '';
+  // risco contra europeias/argentina
+  const rivals=['Holanda?','França','Espanha','Inglaterra','Argentina','Portugal'];
+  const rivalNames={'França':'França','Espanha':'Espanha','Inglaterra':'Inglaterra','Argentina':'Argentina','Portugal':'Portugal','Países Baixos':'Países Baixos'};
+  const bigList=['França','Espanha','Inglaterra','Argentina','Portugal','Países Baixos'];
+  const h2h=bigList.map(nm=>{ const opp=teams.find(x=>x.nome===nm); const p=h2hWin(t.id,opp.id,2500); return {nm,p}; });
+  const players=[
+    ['Carlo Ancelotti (técnico)','Treinador de elite na 1ª Copa pelo Brasil; dá organização e gestão de mata-mata, mas com pouco tempo de trabalho (estabilidade ainda em construção).','op'],
+    ['Neymar (34)','Convocado, porém com estiramento grau 2 na panturrilha; dúvida para a estreia vs Marrocos, possível volta na 2ª/3ª rodada.','op'],
+    ['Vini Jr.','Referência ofensiva e peça central do projeto. Disponível.','ok'],
+    ['Rodrygo','FORA — ruptura de ligamento (LCA) e menisco.','ok'],
+    ['Endrick','Opção ofensiva jovem; atenção ao ritmo por pouca minutagem no clube.','op'],
+    ['Estêvão','FORA — lesão muscular (posterior da coxa).','ok'],
+    ['Casemiro','Experiência no meio-campo; ponto de atenção é ritmo/idade.','op'],
+    ['Militão','FORA — cirurgia (lesão na coxa).','ok'],
+    ['Marquinhos','Titular e capitão da defesa. Disponível.','ok'],
+    ['Gabriel (Magalhães)','Em alta; forma dupla de zaga forte com Marquinhos.','ok'],
+    ['Alisson','Disponível; goleiro de elite, peça-chave em mata-mata.','ok'],
+    ['Ederson','Alternativa de altíssimo nível no gol.','op'],
+    ['Laterais','Geração em transição (Vanderson/Wesley à direita; lado esquerdo em aberto) — ponto de atenção.','op']
+  ];
+  $('#brazil').innerHTML=`
+    <div class="row" style="justify-content:space-between;align-items:flex-start">
+      <div><div class="muted">Classificação do modelo</div><div class="big" style="color:${clsCol}">${cls}</div></div>
+      <div style="text-align:right"><div class="muted">Probabilidade de título</div><div class="big" style="color:#e3b341">${pct(r.pTit)}</div></div>
+    </div>
+    <p style="margin:8px 0 14px">${clsWhy}</p>
+    <div class="cardgrid">
+      <div class="card"><h4>Chances por fase (modelo)</h4>
+        <div class="kv"><span>Passar da fase de grupos</span><b>${pct(r.pAdv)}</b></div>
+        <div class="kv"><span>Chegar às oitavas (R16)</span><b>${pct(r.pR16)}</b></div>
+        <div class="kv"><span>Chegar às quartas</span><b>${pct(r.pQF)}</b></div>
+        <div class="kv"><span>Chegar à semifinal</span><b>${pct(r.pSF)}</b></div>
+        <div class="kv"><span>Chegar à final</span><b>${pct(r.pFin)}</b></div>
+        <div class="kv"><span>Ser campeã</span><b style="color:#e3b341">${pct(r.pTit)}</b></div>
+        <div class="kv"><span>Cair logo no R32 (32 avos)</span><b>${pct(Math.max(0,r.pAdv-r.pR16))}</b></div>
+        <div class="kv"><span>Cair nas oitavas</span><b>${pct(Math.max(0,r.pR16-r.pQF))}</b></div>
+        <div class="kv"><span>Cair nas quartas</span><b>${pct(Math.max(0,r.pQF-r.pSF))}</b></div>
+      </div>
+      <div class="card"><h4>Adversários mais prováveis (caminho)</h4>${advHtml||'<span class="muted">—</span>'}
+        ${d?`<div class="kv" style="margin-top:6px"><span>Dificuldade média do caminho</span><b>${d.dif}/100</b></div>`:''}</div>
+      <div class="card"><h4>Risco direto (1 jogo) vs gigantes</h4>
+        ${h2h.map(x=>`<div class="kv"><span>vs ${x.nm}</span><b style="color:${x.p>=0.5?'#62e08a':'#ff9a92'}">${pct(x.p)} de vitória</b></div>`).join('')}
+        <p class="note">Probabilidade de vencer um confronto único (90'+prorrogação+pênaltis), pela base atual.</p></div>
+    </div>
+    <h3>Situação do elenco (forças, fraquezas e notícias)</h3>
+    <div class="cardgrid">${players.map(p=>`<div class="card"><b>${p[0]}</b> <span class="pill ${p[2]}">${p[2]==='ok'?'confirmado':'provável'}</span><div class="muted" style="margin-top:4px">${p[1]}</div></div>`).join('')}</div>
+    <h3>Encaixe tático e leitura final</h3>
+    <p><b>Principais forças:</b> zaga de alto nível (Gabriel–Marquinhos), goleiro de elite (Alisson/Ederson), banco razoável para torneio longo e a individualidade de Vini Jr. <br>
+    <b>Principais fraquezas:</b> perda de criação e velocidade no ataque (Rodrygo e Estêvão fora), Neymar sem ritmo, laterais em transição e pouca rodagem do time de Ancelotti junto.<br>
+    <b>Encaixe provável:</b> 4-3-3 com Vini pela esquerda, controle de meio com Casemiro/Bruno Guimarães e aposta na solidez defensiva + transições. Contra blocos baixos (Marrocos, por exemplo), a falta de um articulador fino é o maior risco.<br>
+    <b>Contra europeias fortes:</b> defensivamente o Brasil compete de igual para igual (ver tabela acima); o gargalo é transformar superioridade em gols sem os criadores lesionados. <b>Isso não é certeza</b> — depende da recuperação de Neymar, do ritmo de Endrick/Estêvão e do sorteio do mata-mata.</p>`;
+}
+
+/* =====================================================================================
+   IMPORT / EXPORT / PERSISTÊNCIA
+   ===================================================================================== */
+function exportCSV(){
+  if(!lastResults){ alert('Rode uma simulação primeiro.'); return; }
+  const rows=[...lastResults.rows].sort((a,b)=>b.pTit-a.pTit);
+  let csv='Pos;Selecao;Grupo;Avancar;Oitavas;Quartas;Semi;Final;Titulo;Forca\n';
+  rows.forEach((r,i)=>{ csv+=`${i+1};${r.nome};${r.grupo};${(r.pAdv*100).toFixed(2)};${(r.pR16*100).toFixed(2)};${(r.pQF*100).toFixed(2)};${(r.pSF*100).toFixed(2)};${(r.pFin*100).toFixed(2)};${(r.pTit*100).toFixed(2)};${r.forca}\n`; });
+  download('resultados_copa2026.csv', csv, 'text/csv');
+}
+function exportJSON(){ download('base_copa2026.json', JSON.stringify({teams,W,CFG},null,2), 'application/json'); }
+function importJSON(file){
+  const fr=new FileReader();
+  fr.onload=()=>{ try{
+      const o=JSON.parse(fr.result);
+      if(Array.isArray(o.teams)){ teams=o.teams.map((t,i)=>Object.assign({id:i},t)); }
+      if(o.W)W=Object.assign({},W,o.W); if(o.CFG)CFG=Object.assign({},CFG,o.CFG);
+      syncCfgInputs(); renderWeights(); renderTeamsTable(); recompute(); updateForca();
+      log('Base importada do arquivo JSON ('+teams.length+' seleções).');
+    }catch(e){ alert('JSON inválido: '+e.message); } };
+  fr.readAsText(file);
+}
+function saveLocal(){ localStorage.setItem(STORAGE_KEY, JSON.stringify({teams,W,CFG})); log('Base salva no navegador (localStorage).'); setStatus('Alterações salvas no navegador.'); }
+function restoreDefaults(){ if(!confirm('Restaurar todos os dados originais? Suas edições serão perdidas.'))return;
+  localStorage.removeItem(STORAGE_KEY); teams=buildTeams(TEAMS_DNA); W=Object.assign({},W_DEFAULT); CFG={base:1.32,katk:1.55,kdef:1.55,host:1.06};
+  syncCfgInputs(); renderWeights(); renderTeamsTable(); recompute(); updateForca(); log('Dados originais restaurados.'); }
+function download(name,content,type){ const b=new Blob([content],{type}); const u=URL.createObjectURL(b);
+  const a=document.createElement('a'); a.href=u; a.download=name; a.click(); URL.revokeObjectURL(u); }
+function syncCfgInputs(){ $('#cBase').value=CFG.base; $('#cAtk').value=CFG.katk; $('#cDef').value=CFG.kdef; $('#cHost').value=CFG.host; }
+
+/* ---------- metodologia (texto fixo) ---------- */
+function renderMethodology(){
+  $('#methodology').innerHTML=`
+  <h3>Como o modelo funciona</h3>
+  <p>Cada seleção tem ~29 atributos. A <b>Força Final</b> (0–100) é a média ponderada de 6 blocos (pesos W1–W5 e W7), e o peso
+  <b>W6 (caminho/mata-mata)</b> vira um pequeno bônus em jogos eliminatórios para times com bom goleiro, bons cobradores e experiência.
+  Para cada jogo, o modelo calcula <b>gols esperados</b> (λ) e sorteia o placar por <b>distribuição de Poisson</b> — então simula placares, não apenas "quem vence".</p>
+  <p style="font-family:ui-monospace,monospace;font-size:12px;background:#0a0e14;padding:8px;border-radius:6px">
+  λ(A) = μ × fatorAtaque(A) × fragilidadeDefensiva(B) × fatorMomento(A) × fatorCasa(A)<br>
+  fatorAtaque(A)=exp(K_ATK·(ataqueA−0,5)) · fragilidadeDefensiva(B)=exp(K_DEF·(0,5−defesaB))</p>
+  <p class="note">Lesões, notícias, qualidade de elenco e ajuste manual entram na Força Final (bloco B4 e o ajuste), que por sua vez alimenta ataque/defesa — assim afetam os gols sem dupla contagem.</p>
+  <h3>Formato simulado (oficial FIFA 2026)</h3>
+  <p>48 seleções · 12 grupos de 4 · 2 primeiros + 8 melhores 3ºs avançam (32 times) · mata-mata: 32 avos → oitavas → quartas → semi → final.
+  Vitória 3 pts, empate 1, derrota 0; desempate por saldo, gols pró e confronto direto. No mata-mata: tempo normal → prorrogação → pênaltis.</p>
+  <h3>Dados: o que é confirmado, provável e estimado</h3>
+  <ul>
+    <li><span class="pill ok">confirmado</span> <b>Grupos e chaveamento</b> (sorteio FIFA, 05/12/2025) e <b>ranking FIFA</b> (01/04/2026: Fra1, Esp2, Arg3, Ing4, Por5, Bra6).</li>
+    <li><span class="pill op">provável</span> <b>Notícias/escalações</b> (jun/2026): desfalques do Brasil (Rodrygo, Militão, Estêvão; Neymar limitado), Yamal dúvida (Espanha), Saliba recuperado (França), Neuer (Alemanha), Ronaldo (Portugal).</li>
+    <li><span class="pill est">estimativa</span> <b>Todos os atributos 0–100</b> (ataque, defesa, elenco, técnico, momento etc.): estimados pelo autor do modelo e calibrados pelo ranking, valor de elenco e mercado. <b>São totalmente editáveis.</b></li>
+  </ul>
+  <h3>Limitações</h3>
+  <ul>
+    <li>A alocação dos 8 melhores 3ºs aos jogos do R32 usa um <b>emparelhamento válido por restrição de grupos</b> (aproximação coerente; a tabela oficial da FIFA pode escolher outro slot específico para um mesmo conjunto de grupos).</li>
+    <li>Gols por Poisson independente (não modela explicitamente correlação/"placar travado"); fair-play e sorteio de moeda nos desempates são aproximados.</li>
+    <li>Os atributos são um retrato de jun/2026 — <b>atualize-os</b> quando surgirem lesões, cortes ou mudanças de escalação.</li>
+  </ul>
+  <h3>Fontes</h3>
+  <p class="note">FIFA (inside.fifa.com), ESPN, Reuters/AP, BBC, Sky Sports, The Athletic, Al Jazeera, FOX/CBS Sports e odds de DraftKings/FanDuel — consultadas em jun/2026. Atributos numéricos são estimativa do modelo, não dados oficiais.</p>`;
+}
+
+/* =====================================================================================
+   WIRING + INICIALIZAÇÃO
+   ===================================================================================== */
+function wire(){
+  document.querySelectorAll('button.sim').forEach(b=>b.addEventListener('click',()=>{
+    document.querySelectorAll('button.sim').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active'); N_SIMS=+b.dataset.n;
+    if(N_SIMS>=100000) setStatus('100.000 simulações: pode levar de 20s a 1min dependendo do computador.');
+  }));
+  $('#btnRun').addEventListener('click',()=>{ $('#log').textContent=''; runSimulations(N_SIMS); });
+  $('#btnAdv').addEventListener('click',e=>{ showAdvanced=!showAdvanced; e.target.textContent=(showAdvanced?'– Ocultar':'+ Mostrar')+' colunas avançadas'; renderTeamsTable(); });
+  $('#btnWnorm').addEventListener('click',()=>{ const s=W.w1+W.w2+W.w3+W.w4+W.w5+W.w6+W.w7; if(!s)return;
+    ['w1','w2','w3','w4','w5','w6','w7'].forEach(k=>W[k]=Math.round(W[k]*100/s)); renderWeights(); recompute(); updateForca(); });
+  $('#btnWreset').addEventListener('click',()=>{ W=Object.assign({},W_DEFAULT); renderWeights(); recompute(); updateForca(); });
+  ['cBase','cAtk','cDef','cHost'].forEach(id=>$('#'+id).addEventListener('input',()=>{
+    CFG.base=+$('#cBase').value; CFG.katk=+$('#cAtk').value; CFG.kdef=+$('#cDef').value; CFG.host=+$('#cHost').value;
+    recompute(); updateForca();
+  }));
+  $('#btnSave').addEventListener('click',saveLocal);
+  $('#btnRestore').addEventListener('click',restoreDefaults);
+  $('#btnExpJson').addEventListener('click',exportJSON);
+  $('#btnExpCsv').addEventListener('click',exportCSV);
+  $('#btnImpJson').addEventListener('click',()=>$('#fileJson').click());
+  $('#fileJson').addEventListener('change',e=>{ if(e.target.files[0])importJSON(e.target.files[0]); e.target.value=''; });
+}
+function init(){
+  try{ const saved=localStorage.getItem(STORAGE_KEY);
+    if(saved){ const o=JSON.parse(saved);
+      teams=(o.teams&&o.teams.length)?o.teams.map((t,i)=>Object.assign({id:i},t)):buildTeams(TEAMS_DNA);
+      if(o.W)W=Object.assign({},W_DEFAULT,o.W); if(o.CFG)CFG=Object.assign({},CFG,o.CFG);
+      log('Base carregada do navegador (localStorage). Use "Restaurar" para voltar ao original.');
+    } else teams=buildTeams(TEAMS_DNA);
+  }catch(e){ teams=buildTeams(TEAMS_DNA); }
+  syncCfgInputs(); renderWeights(); renderTeamsTable(); recompute(); updateForca(); renderMethodology(); wire();
+  log('Simulador pronto. 48 seleções carregadas. Ajuste o que quiser e clique em "Rodar simulação".');
+}
+document.addEventListener('DOMContentLoaded',init);
+/* fim */
+</script>
+</body>
+</html>
