@@ -19,7 +19,7 @@
   h2{font-size:18px;margin:26px 0 10px;border-left:4px solid var(--accent);padding-left:10px}
   h3{font-size:15px;margin:16px 0 8px;color:var(--accent2)}
   .sub{color:var(--muted);font-size:13px;max-width:1100px}
-  .wrap{max-width:1240px;margin:0 auto;padding:0 14px 60px}
+  .wrap{max-width:1680px;margin:0 auto;padding:0 10px 60px}
   .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:14px 0}
   .grid{display:grid;gap:14px}
   .row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
@@ -76,6 +76,9 @@
   .note{font-size:12px;color:var(--muted);font-style:italic}
   .ribbon{display:inline-block;font-size:11px;font-weight:800;padding:3px 10px;border-radius:20px}
   details summary{cursor:pointer;color:var(--accent2);font-weight:600;margin:6px 0}
+  .anitem{border:1px solid var(--line);border-radius:10px;padding:6px 12px;margin:8px 0;background:var(--panel)}
+  .anitem>summary{font-size:14.5px;color:var(--txt)}
+  .anitem[open]>summary{margin-bottom:4px;border-bottom:1px solid var(--line);padding-bottom:6px}
   .toprow td{font-size:13px}
   /* ----- abas ----- */
   .tabs{display:flex;gap:6px;margin:16px 0 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
@@ -218,8 +221,12 @@
   <h2>9 · 🇧🇷 Análise especial do Brasil</h2>
   <div id="brazil" class="brbox"><p class="muted">Rode a simulação para gerar a análise do Brasil com os números atuais da base.</p></div>
 
+  <!-- ============ TOP 10 — ANÁLISE DETALHADA ============ -->
+  <h2>10 · Análise das Top 10 seleções <span class="note">(favoritas ao título — mesma leitura da análise do Brasil)</span></h2>
+  <div id="top10analysis"><p class="muted">Rode a simulação para gerar a análise detalhada das 10 seleções favoritas.</p></div>
+
   <!-- ============ METODOLOGIA ============ -->
-  <h2>10 · Metodologia, limitações e fontes</h2>
+  <h2>11 · Metodologia, limitações e fontes</h2>
   <div class="panel" id="methodology"></div>
 
   </div><!-- /pane-sim -->
@@ -677,7 +684,7 @@ function runSimulations(N){
     first:new Int32Array(48),second:new Int32Array(48)};
   // watchlist de caminhos: 12 mais fortes + Brasil
   const order=[...teams].sort((a,b)=>b.forca-a.forca);
-  const watchIds=new Set(order.slice(0,12).map(t=>t.id));
+  const watchIds=new Set(order.slice(0,16).map(t=>t.id)); // cobre as top 10 favoritas (caminhos)
   const bra=teams.find(t=>t.nome==='Brasil'); if(bra)watchIds.add(bra.id);
   const paths={}; watchIds.forEach(id=>paths[id]={R32:{},R16:{},QF:{},SF:{},FINAL:{}});
 
@@ -806,7 +813,7 @@ function obsShort(t){
 /* ---------- render principal ---------- */
 function renderAll(){
   if(!lastResults) return;
-  renderResults(); renderTop10(); renderMarket(); renderGroups(); renderPaths(); renderBrazil();
+  renderResults(); renderTop10(); renderMarket(); renderGroups(); renderPaths(); renderBrazil(); renderTop10Analysis();
 }
 function renderResults(){
   const rows=[...lastResults.rows].sort((a,b)=> b.pTit-a.pTit || b.pAdv-a.pAdv);
@@ -900,15 +907,45 @@ function renderPaths(){
 /* ---------- confronto direto (1 jogo) por Monte Carlo rápido ---------- */
 function h2hWin(a,b,n){ n=n||3000; if(!P)recompute(); let w=0; for(let i=0;i<n;i++){ if(koMatch(a,b)===a)w++; } return w/n; }
 
+/* ---------- classificação e leitura genéricas (compartilhadas: Brasil + Top 10) ---------- */
+function modelClass(pTit){
+  if(pTit>=0.15)  return {cls:'Favorito real',   col:'#62e08a'};
+  if(pTit>=0.085) return {cls:'Candidato forte', col:'#9fd0ff'};
+  if(pTit>=0.04)  return {cls:'Candidato médio', col:'#e3b341'};
+  return {cls:'Azarão de luxo', col:'#ff9a92'};
+}
+function strengthsList(t){
+  const o=[];
+  if(t.ataque>=82)o.push('ataque de elite'); else if(t.ataque>=74)o.push('bom poder ofensivo');
+  if(t.defesa>=80)o.push('defesa muito sólida'); else if(t.defesa>=74)o.push('defesa consistente');
+  if(t.goleiro>=78)o.push('goleiro de elite');
+  if(t.elenco>=82)o.push('elenco profundíssimo'); else if(t.banco>=74)o.push('banco forte');
+  if(t.histKO>=74)o.push('traquejo de mata-mata');
+  if(t.expCopas>=90)o.push('muita experiência em Copas');
+  if(t.momento>=78)o.push('em ótimo momento');
+  if(t.penaltis>=78)o.push('forte nos pênaltis');
+  if(HOSTS.has(t.nome))o.push('fator casa (anfitriã)');
+  return o.length?o:['equipe equilibrada'];
+}
+function weaknessesList(t){
+  const o=[];
+  if(t.disp<72)o.push('desfalques/lesões importantes');
+  if(t.news<=-5)o.push('notícias recentes negativas');
+  if(t.defesa<70)o.push('defesa vulnerável');
+  if(t.banco<60)o.push('banco curto');
+  if(t.goleiro<68)o.push('goleiro é dúvida');
+  if(t.expCopas<60)o.push('pouca experiência em Copas');
+  if(t.histKO<48)o.push('pouco mata-mata');
+  if(t.ataque<74)o.push('poder de fogo limitado');
+  if(t.momento<64)o.push('momento irregular');
+  return o.length?o:['poucos pontos fracos evidentes'];
+}
+
 function renderBrazil(){
   const r=lastResults.rows.find(x=>x.nome==='Brasil'); if(!r){return;}
   const t=teams[r.id];
   // classificação dinâmica pela probabilidade de título
-  let cls,clsCol,clsWhy;
-  if(r.pTit>=0.15){cls='Favorito real';clsCol='#62e08a';}
-  else if(r.pTit>=0.085){cls='Candidato forte';clsCol='#9fd0ff';}
-  else if(r.pTit>=0.04){cls='Candidato médio';clsCol='#e3b341';}
-  else {cls='Azarão de luxo';clsCol='#ff9a92';}
+  const _mc=modelClass(r.pTit); let cls=_mc.cls, clsCol=_mc.col, clsWhy;
   clsWhy=`Com a base atual (Força ${t.forca}, com Rodrygo, Militão e Estêvão fora e Neymar limitado), o modelo dá ${pct(r.pTit)} de título e ${pct(r.pSF)} de semifinal. `+
     `A zaga (Gabriel–Marquinhos), o goleiro (Alisson) e o banco mantêm o Brasil competitivo, mas a perda de criadores e velocidade no ataque reduz o teto. Por isso a classificação "${cls}".`;
   // adversários prováveis
@@ -965,6 +1002,56 @@ function renderBrazil(){
     <b>Principais fraquezas:</b> perda de criação e velocidade no ataque (Rodrygo e Estêvão fora), Neymar sem ritmo, laterais em transição e pouca rodagem do time de Ancelotti junto.<br>
     <b>Encaixe provável:</b> 4-3-3 com Vini pela esquerda, controle de meio com Casemiro/Bruno Guimarães e aposta na solidez defensiva + transições. Contra blocos baixos (Marrocos, por exemplo), a falta de um articulador fino é o maior risco.<br>
     <b>Contra europeias fortes:</b> defensivamente o Brasil compete de igual para igual (ver tabela acima); o gargalo é transformar superioridade em gols sem os criadores lesionados. <b>Isso não é certeza</b> — depende da recuperação de Neymar, do ritmo de Endrick/Estêvão e do sorteio do mata-mata.</p>`;
+}
+
+/* ---------- Análise detalhada das Top 10 (mesma leitura da seção do Brasil) ---------- */
+function renderTop10Analysis(){
+  if(!lastResults){ return; }
+  if(!P) recompute();
+  const top=[...lastResults.rows].sort((a,b)=>b.pTit-a.pTit).slice(0,10);
+  const giants=top.map(r=>r.id);
+  const lbl={R32:'32 avos',R16:'Oitavas',QF:'Quartas',SF:'Semi',FINAL:'Final'};
+  $('#top10analysis').innerHTML=top.map((r,i)=>{
+    const t=teams[r.id], mc=modelClass(r.pTit);
+    const str=strengthsList(t), wk=weaknessesList(t);
+    const why=`Com a base atual (Força ${t.forca}), o modelo projeta ${pct(r.pTit)} de título, ${pct(r.pFin)} de final e ${pct(r.pSF)} de semifinal. `+
+      `Forças: ${str.slice(0,3).join(', ')}. Atenção: ${wk.slice(0,2).join(', ')}. Leitura do modelo: “${mc.cls}”.`;
+    const d=pathDifficulty(r.id);
+    const advHtml=d?d.steps.map(s=>`<div class="kv"><span>${lbl[s.rk]}</span><b>${s.name} <span class="muted">(${(s.share*100).toFixed(0)}%)</span></b></div>`).join('')
+      :'<span class="muted">Caminho indisponível (rode mais simulações).</span>';
+    // risco direto (1 jogo) contra as outras gigantes do top — versão analítica (prob. de avançar)
+    const h2h=giants.filter(id=>id!==r.id).map(id=>({nm:teams[id].nome,p:predictKOGame(r.id,id).advA}))
+      .sort((a,b)=>b.p-a.p).slice(0,6);
+    return `<details class="anitem"${i<3?' open':''}>
+      <summary><b>#${i+1} ${t.nome}</b> <span class="tag" style="background:${mc.col}22;color:${mc.col}">${mc.cls}</span> <span class="muted">· título ${pct(r.pTit)} · Força ${t.forca}</span></summary>
+      <div class="brbox" style="margin-top:8px">
+        <div class="row" style="justify-content:space-between;align-items:flex-start">
+          <div><div class="muted">Classificação do modelo</div><div class="big" style="color:${mc.col}">${mc.cls}</div></div>
+          <div style="text-align:right"><div class="muted">Probabilidade de título</div><div class="big" style="color:#e3b341">${pct(r.pTit)}</div></div>
+        </div>
+        <p style="margin:8px 0 12px">${why}</p>
+        <div class="cardgrid">
+          <div class="card"><h4>Chances por fase</h4>
+            <div class="kv"><span>Passar do grupo</span><b>${pct(r.pAdv)}</b></div>
+            <div class="kv"><span>Oitavas (R16)</span><b>${pct(r.pR16)}</b></div>
+            <div class="kv"><span>Quartas</span><b>${pct(r.pQF)}</b></div>
+            <div class="kv"><span>Semifinal</span><b>${pct(r.pSF)}</b></div>
+            <div class="kv"><span>Final</span><b>${pct(r.pFin)}</b></div>
+            <div class="kv"><span>Título</span><b style="color:#e3b341">${pct(r.pTit)}</b></div>
+          </div>
+          <div class="card"><h4>Adversários prováveis (caminho)</h4>${advHtml}
+            ${d?`<div class="kv" style="margin-top:6px"><span>Dificuldade média</span><b>${d.dif}/100</b></div>`:''}</div>
+          <div class="card"><h4>Risco direto (1 jogo) vs gigantes</h4>
+            ${h2h.map(x=>`<div class="kv"><span>vs ${x.nm}</span><b style="color:${x.p>=0.5?'#62e08a':'#ff9a92'}">${pct(x.p)}</b></div>`).join('')}
+            <p class="note">Prob. de vencer um confronto único (90'+prorrogação+pênaltis), pela base atual.</p></div>
+          <div class="card"><h4>Forças, fraquezas e notícias</h4>
+            <div class="kv"><span>Forças</span><b style="color:#62e08a;text-align:right;max-width:62%">${str.slice(0,4).join(' · ')}</b></div>
+            <div class="kv"><span>Fraquezas</span><b style="color:#ff9a92;text-align:right;max-width:62%">${wk.slice(0,3).join(' · ')}</b></div>
+            <div class="muted" style="margin-top:6px">${(t.obs||'').replace(/</g,'&lt;')}</div></div>
+        </div>
+      </div>
+    </details>`;
+  }).join('');
 }
 
 /* =====================================================================================
