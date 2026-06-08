@@ -94,6 +94,12 @@
     padding:14px 16px;margin:10px 0;display:flex;align-items:center;gap:14px}
   .champbanner .big{font-size:24px;color:var(--gold)}
   .predbase b{color:var(--accent2)}
+  /* ----- aba de cálculos ----- */
+  .formula{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;background:#0a0e14;
+    border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin:8px 0;white-space:pre-wrap;color:#cbd5e1;overflow-x:auto}
+  .formula .c{color:#7ee2a0;font-weight:700}
+  #calcContent h2{margin-top:22px}
+  #calcContent .panel p{margin:6px 0}
   @media(max-width:640px){ input.obs{width:150px} .big{font-size:24px} }
 </style>
 </head>
@@ -121,6 +127,7 @@
   <div class="tabs" role="tablist">
     <button class="tabbtn active" data-tab="sim">🎲 Simulador</button>
     <button class="tabbtn" data-tab="pred">📊 Prognósticos das Partidas</button>
+    <button class="tabbtn" data-tab="calc">📐 Cálculos</button>
   </div>
 
   <div id="pane-sim" class="tabpane">
@@ -158,15 +165,15 @@
       <summary>Parâmetros avançados do motor de gols (Poisson com sobredispersão)</summary>
       <div class="wgrid" style="margin-top:8px">
         <label class="fld">Gols-base por equipe (μ)
-          <input type="number" id="cBase" step="0.01" value="1.30"></label>
+          <input type="number" id="cBase" step="0.01" value="1.27"></label>
         <label class="fld">Sensibilidade do ataque (K_ATK)
-          <input type="number" id="cAtk" step="0.05" value="1.55"></label>
+          <input type="number" id="cAtk" step="0.05" value="1.90"></label>
         <label class="fld">Sensibilidade da defesa (K_DEF)
-          <input type="number" id="cDef" step="0.05" value="1.55"></label>
+          <input type="number" id="cDef" step="0.05" value="1.90"></label>
         <label class="fld">Bônus de anfitrião (casa)
           <input type="number" id="cHost" step="0.01" value="1.06"></label>
         <label class="fld">Imprevisibilidade (sobredispersão)
-          <input type="number" id="cDisp" step="0.02" min="0" value="0.16"></label>
+          <input type="number" id="cDisp" step="0.02" min="0" value="0.12"></label>
       </div>
       <p class="note">μ maior = mais gols. <b>Imprevisibilidade</b> (0 = Poisson puro): cada jogo recebe um fator de “dia bom/ruim”, aumentando a variância dos placares e a chance de zebras/goleadas. Anfitriões (México, Canadá, EUA) recebem o bônus de casa em todos os jogos.</p>
     </details>
@@ -250,7 +257,7 @@
         <b>Placares</b> = os 3 placares exatos mais prováveis, cada um com sua probabilidade · <b>Vit./Emp.</b> = resultado em 90' ·
         <b>+2.5</b> = probabilidade de mais de 2,5 gols · <b>Ambas</b> = ambas as equipes marcam.
         No mata-mata: <b>Pênaltis</b> = empate em 90' × empate na prorrogação, e <b>Avança</b> combina vitória em 90' + prorrogação + pênaltis.
-        O motor usa <b>Poisson com sobredispersão</b> (imprevisibilidade) e μ calibrado para a média de gols das Copas (~2,8/jogo) — ajustáveis nos parâmetros avançados da aba Simulador.
+        O motor usa <b>Poisson com sobredispersão</b> (imprevisibilidade), calibrado para a média de gols das Copas (~2,75/jogo). Veja a aba <b>📐 Cálculos</b> para a explicação completa; tudo é ajustável nos parâmetros avançados da aba Simulador.
         Tudo é recalculado com os pesos e dados atuais (ao abrir a aba, em “Atualizar” ou ao terminar uma simulação).
       </p>
     </div>
@@ -263,6 +270,12 @@
     <div id="predKO"></div>
 
   </div><!-- /pane-pred -->
+
+  <!-- ============ ABA: CÁLCULOS ============ -->
+  <div id="pane-calc" class="tabpane hide">
+    <h2>📐 Como os cálculos funcionam <span class="note">(explicação detalhada do modelo estatístico)</span></h2>
+    <div id="calcContent"></div>
+  </div><!-- /pane-calc -->
 
 </div>
 
@@ -472,7 +485,7 @@ const W_META = [
   ['w6','Caminho/contexto de mata-mata'],
   ['w7','Histórico em Copas e experiência']
 ];
-let CFG = {base:1.30, katk:1.55, kdef:1.55, host:1.06, disp:0.16};
+let CFG = {base:1.27, katk:1.90, kdef:1.90, host:1.06, disp:0.12};
 
 /* arrays pré-computados por simulação (índice = id da seleção) */
 let P = null; // {forca,aG,dG,aK,dK,ctx}
@@ -1099,7 +1112,7 @@ function importJSON(file){
 }
 function saveLocal(){ localStorage.setItem(STORAGE_KEY, JSON.stringify({teams,W,CFG})); log('Base salva no navegador (localStorage).'); setStatus('Alterações salvas no navegador.'); }
 function restoreDefaults(){ if(!confirm('Restaurar todos os dados originais? Suas edições serão perdidas.'))return;
-  localStorage.removeItem(STORAGE_KEY); teams=buildTeams(TEAMS_DNA); W=Object.assign({},W_DEFAULT); CFG={base:1.30,katk:1.55,kdef:1.55,host:1.06,disp:0.16};
+  localStorage.removeItem(STORAGE_KEY); teams=buildTeams(TEAMS_DNA); W=Object.assign({},W_DEFAULT); CFG={base:1.27,katk:1.90,kdef:1.90,host:1.06,disp:0.12};
   syncCfgInputs(); renderWeights(); renderTeamsTable(); recompute(); updateForca(); log('Dados originais restaurados.'); }
 function download(name,content,type){ const b=new Blob([content],{type}); const u=URL.createObjectURL(b);
   const a=document.createElement('a'); a.href=u; a.download=name; a.click(); URL.revokeObjectURL(u); }
@@ -1369,12 +1382,162 @@ function schedulePredictions(){
   if(activeTab!=='pred') return;        // se não está visível, será recalculado ao abrir a aba
   clearTimeout(_predTimer); _predTimer=setTimeout(renderPredictions,180);
 }
+/* ---------- aba CÁLCULOS: explica todo o pipeline estatístico com os parâmetros atuais ---------- */
+function renderMethodCalc(){
+  const den=W.w1+W.w2+W.w3+W.w4+W.w5+W.w7;
+  $('#calcContent').innerHTML=`
+  <div class="panel">
+    <p>Esta aba detalha <b>todos os cálculos</b> do simulador, na ordem em que acontecem. Os valores entre colchetes usam os
+    <b>parâmetros atuais</b>: μ=${CFG.base}, K_ATK=${CFG.katk}, K_DEF=${CFG.kdef}, imprevisibilidade=${CFG.disp}, bônus de casa=${CFG.host}.
+    Altere-os na aba Simulador (pesos e “Parâmetros avançados”) e reabra esta aba para ver o efeito.</p>
+  </div>
+
+  <h2>0 · Visão geral do pipeline</h2>
+  <div class="panel"><div class="formula">DNA das 48 seleções (atributos 0–100)
+ └─ buildTeams(): expande ~29 atributos por seleção
+     └─ recompute(): Força Final (0–100) + multiplicadores de ataque/defesa
+         └─ λ = gols esperados de cada lado, jogo a jogo
+             ├─ Analítico (aba Prognósticos): Poisson com sobredispersão → probabilidades exatas
+             └─ Monte Carlo (botão “Rodar simulação”): sorteia N torneios → frequências por fase</div>
+   <p class="note">O mesmo λ alimenta os dois caminhos — por isso a aba de prognósticos é coerente com a simulação.</p></div>
+
+  <h2>1 · Força Final (0–100)</h2>
+  <div class="panel">
+    <p>É a média ponderada de 6 blocos (cada um normalizado em 0–1) pelos pesos editáveis W1–W5 e W7. O peso W6 não entra aqui — vira bônus de mata-mata (seção 3).</p>
+    <div class="formula">B1 força atual  = 0,65·eloPct + 0,35·fifaPct
+     eloPct = clamp((Elo − 1500) / 600, 0, 1)
+     fifaPct = clamp(1 − (rankFIFA − 1) / 85, 0, 1)
+B2 recente      = média(momento, últ.24m, eliminatórias) / 100
+B3 elenco       = média(elenco, titular, banco, mín(valor/1400, 1))
+B4 contexto     = 0,45·disp + 0,25·ritmo + 0,30·newsN
+     newsN = clamp(0,5 + notícias/20, 0, 1)
+B5 estatístico  = média(ataque, defesa, bola parada, criação, transições, def. vs bloco baixo)
+B7 experiência  = média(exp. em Copas, histórico de mata-mata)
+
+S = (W1·B1 + W2·B2 + W3·B3 + W4·B4 + W5·B5 + W7·B7) / (W1+W2+W3+W4+W5+W7)
+S = clamp(S + ajusteManual/100, 0,03, 0,99)
+Força Final = arredondar(S × 100)</div>
+    <p class="note">Pesos atuais: ${W_META.map((m,i)=>'W'+(i+1)+'='+W['w'+(i+1)]+'%').join(' · ')} (denominador sem W6 = ${den}%).
+    Lesões e notícias entram no bloco B4 (e o ajuste manual em S) — assim afetam ataque, defesa e gols <i>sem dupla contagem</i>.</p>
+  </div>
+
+  <h2>2 · Especialização ofensiva e defensiva</h2>
+  <div class="panel">
+    <div class="formula">offSpec = média(ataque, criação, bola parada, def. vs bloco baixo)
+defSpec = média(defesa, transições, goleiro)
+AIg = 0,55·S + 0,45·offSpec      (índice de ataque)
+DIg = 0,55·S + 0,45·defSpec      (índice de defesa)</div>
+    <p class="note">Misturar a força geral S (55%) com a especialização (45%) impede distorções, mas mantém a diferenciação entre ataques e defesas.</p>
+  </div>
+
+  <h2>3 · Multiplicadores e bônus de mata-mata</h2>
+  <div class="panel">
+    <div class="formula">aG = exp(K_ATK · (AIg − 0,5))     fator de ataque (grupos)            [K_ATK = ${CFG.katk}]
+dG = exp(K_DEF · (0,5 − DIg))     fragilidade defensiva sofrida (grupos)  [K_DEF = ${CFG.kdef}]
+
+Bônus de mata-mata (peso W6 = ${W.w6}%):
+   koQ = média(goleiro, pênaltis, hist. mata-mata, exp. Copas)
+   Sko = clamp(S + (W6/100)·(koQ − 0,5)·0,5, 0,03, 0,99)
+   aK, dK = como aG, dG, mas usando Sko (valem só no mata-mata)
+
+Contexto: fMom = exp(0,10·(momento − 0,5))
+          fHost = ${CFG.host} se anfitriã (México/Canadá/EUA), senão 1
+          ctx = fMom × fHost</div>
+    <p class="note">K maior = ataques fortes marcam mais e defesas fortes sofrem menos → placares mais decisivos e diferenciados entre jogos (a “elasticidade” dos placares).</p>
+  </div>
+
+  <h2>4 · Gols esperados (λ)</h2>
+  <div class="panel">
+    <div class="formula">λ(A contra B) = μ × aG(A) × dG(B) × ctx(A)         [μ = ${CFG.base}]
+
+xgA = λ(A, B)        xgB = λ(B, A)</div>
+    <p>μ é o nível-base de gols, calibrado para a <b>média histórica das Copas</b> (~2,7–2,8 gols/jogo somando os dois lados). No mata-mata usam-se aK/dK no lugar de aG/dG.</p>
+  </div>
+
+  <h2>5 · Distribuição de gols: Poisson com sobredispersão</h2>
+  <div class="panel">
+    <p>Com λ em mãos, a chance de um time fazer exatamente <i>k</i> gols seria a distribuição de Poisson:</p>
+    <div class="formula">P(k) = e^(−λ) · λ^k / k!</div>
+    <p>Mas o futebol é mais imprevisível que o Poisson puro. Por isso cada jogo recebe um fator aleatório de “dia bom/ruim”
+    G ~ Gama(média 1, variância = ${CFG.disp}); a distribuição de gols vira <b>Binomial Negativa</b> (mistura Gama–Poisson):</p>
+    <div class="formula">φ = 1 / disp        q = λ / (λ + φ)              [disp = ${CFG.disp}]
+P(0) = (φ / (φ + λ))^φ
+P(k) = P(k−1) · (k−1+φ)/k · q          (recorrência)
+Variância = λ + λ²/φ   →  maior que λ (mais zebras e goleadas)</div>
+    <p class="note">disp = 0 reproduz o Poisson puro. Valores maiores espalham mais os placares (mais 0-0 e mais goleadas) e reduzem o domínio dos favoritos. É a <b>mesma</b> distribuição usada na simulação Monte Carlo (função <code>pois</code>) e no cálculo analítico (<code>goalsVec</code>).</p>
+  </div>
+
+  <h2>6 · Probabilidades de um jogo</h2>
+  <div class="panel">
+    <p>Supondo independência entre os gols dos dois times, a probabilidade de um placar exato i–j é o produto das duas distribuições:</p>
+    <div class="formula">P(placar i–j) = P_A(i) × P_B(j)
+
+Vitória de A = Σ P(i–j) com i &gt; j
+Empate       = Σ P(i–j) com i = j
+Vitória de B = Σ P(i–j) com i &lt; j
++2,5 gols    = Σ P(i–j) com i + j ≥ 3
+Ambas marcam = Σ P(i–j) com i ≥ 1 e j ≥ 1
+3 placares mais prováveis = os três (i,j) de maior P(i–j)</div>
+    <p class="note">Somam-se i e j de 0 a 10 (cobre praticamente 100% da massa). <b>Por que nenhum placar passa de ~10–13%?</b>
+    Porque o número de gols de cada time é genuinamente incerto: mesmo num jogo equilibrado, 1–1, 1–0 e 2–1 têm probabilidades parecidas.
+    Por isso mostramos os <b>3 placares</b> + as colunas de resultado, +2,5 e ambas marcam — juntos descrevem o jogo melhor que um placar único.</p>
+  </div>
+
+  <h2>7 · Mata-mata: prorrogação, pênaltis e chance de avançar</h2>
+  <div class="panel">
+    <div class="formula">Tempo normal (90'): probabilidades como na seção 6, usando aK/dK
+Prorrogação: repete o cálculo com λ reduzido (× 0,34 ≈ 30'/90')
+P(pênaltis) = P(empate em 90') × P(empate na prorrogação)
+
+Pênaltis (analítico — 5 cobranças + morte súbita):
+   pA = clamp(0,70 + (pênaltisA − 50)/250 − (goleiroB − 50)/350, 0,55, 0,92)
+   pB = análogo, trocando os papéis
+   P(A vence) = Σ Binom(5,pA,i)·Binom(5,pB,j) [i&gt;j]  +  empates × (morte súbita)
+   morte súbita: pA(1−pB) / ( pA(1−pB) + (1−pA)pB )
+
+P(A avança) = P(vit. A 90') + P(empate 90')·P(vit. A prorrog.) + P(pênaltis)·P(A vence pênaltis)</div>
+    <p class="note">Por construção, P(A avança) + P(B avança) = 1. O vencedor projetado da chave é quem tem maior probabilidade de avançar.</p>
+  </div>
+
+  <h2>8 · Fase de grupos e classificação</h2>
+  <div class="panel">
+    <p>Cada grupo joga os 6 confrontos. Pontuação 3 (vitória) / 1 (empate) / 0 (derrota). Ordenação:</p>
+    <div class="formula">1) pontos → 2) saldo de gols → 3) gols pró → 4) confronto direto (entre empatados) → 5) sorteio</div>
+    <p>Classificam-se os <b>2 primeiros</b> de cada grupo (24) + os <b>8 melhores terceiros</b> entre os 12 (por pontos/saldo/gols pró).
+    Os 8 terceiros são alocados aos confrontos do mata-mata por um emparelhamento que respeita as restrições de grupo do chaveamento oficial da FIFA (backtracking).</p>
+  </div>
+
+  <h2>9 · Simulação Monte Carlo × cálculo analítico</h2>
+  <div class="panel">
+    <p><b>Monte Carlo</b> (“Rodar simulação”): sorteia N torneios inteiros (gols pela distribuição da seção 5), monta grupos e mata-mata e
+    conta quantas vezes cada seleção chega a cada fase. A probabilidade é a frequência ÷ N — quanto maior N, mais estável o número.</p>
+    <p><b>Analítico</b> (aba Prognósticos): em vez de sortear, resolve as probabilidades exatamente, jogo a jogo. Não tem ruído amostral,
+    mas projeta a chave por “quem é mais provável”; o Monte Carlo, por sua vez, explora <i>todos</i> os caminhos possíveis.</p>
+    <div class="formula">Probabilidade de fase (Monte Carlo) = nº de torneios em que o time chegou à fase ÷ N</div>
+  </div>
+
+  <h2>10 · Constantes atuais (resumo)</h2>
+  <div class="panel"><div class="scroll" style="max-height:none">
+    <table><thead><tr><th class="name">Constante</th><th>Valor</th><th style="text-align:left">Papel</th></tr></thead><tbody>
+      <tr><td class="name">μ (gols-base)</td><td>${CFG.base}</td><td style="text-align:left">nível-base de gols por time</td></tr>
+      <tr><td class="name">K_ATK</td><td>${CFG.katk}</td><td style="text-align:left">sensibilidade do ataque (elasticidade dos placares)</td></tr>
+      <tr><td class="name">K_DEF</td><td>${CFG.kdef}</td><td style="text-align:left">sensibilidade da defesa</td></tr>
+      <tr><td class="name">imprevisibilidade</td><td>${CFG.disp}</td><td style="text-align:left">sobredispersão (variância extra dos placares)</td></tr>
+      <tr><td class="name">bônus de casa</td><td>${CFG.host}</td><td style="text-align:left">multiplicador de λ para anfitriãs</td></tr>
+      <tr><td class="name">prorrogação</td><td>× 0,34</td><td style="text-align:left">fração do λ usada na prorrogação</td></tr>
+    </tbody></table></div>
+    <p class="note">Todos editáveis na aba Simulador. Esta aba recalcula os valores sempre que é aberta.</p>
+  </div>
+  `;
+}
 function switchTab(tab){
   activeTab=tab;
   document.querySelectorAll('.tabbtn').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));
   $('#pane-sim').classList.toggle('hide',tab!=='sim');
   $('#pane-pred').classList.toggle('hide',tab!=='pred');
-  if(tab==='pred') renderPredictions();  // recalcula sempre ao abrir a aba
+  $('#pane-calc').classList.toggle('hide',tab!=='calc');
+  if(tab==='pred') renderPredictions();   // recalcula sempre ao abrir a aba
+  if(tab==='calc') renderMethodCalc();    // mostra os cálculos com os parâmetros atuais
 }
 
 /* ---------- exportar prognósticos em CSV ---------- */
